@@ -11,56 +11,28 @@ solvency2:
 # ============================================
 #  SCR Market Correlation Matrices
 # ============================================
-scr_correlation:
-  downward:             # Interest rate downward scenario
-    interest:
-      interest: 1.0
-      equity: 0.5
-      property: 0.5
-      spread: 0.5
-    equity:
-      interest: 0.5
-      equity: 1.0
-      property: 0.75
-      spread: 0.75
-    property:
-      interest: 0.5
-      equity: 0.75
-      property: 1.0
-      spread: 0.5
-    spread:
-      interest: 0.5
-      equity: 0.75
-      property: 0.5
-      spread: 1.0
+correlations:
+  downward:
+    labels: ["interest", "equity", "property", "spread"]
+    matrix:
+      - [1.0, 0.5, 0.5, 0.5]
+      - [0.5, 1.0, 0.75, 0.75]
+      - [0.5, 0.75, 1.0, 0.5]
+      - [0.5, 0.75, 0.5, 1.0]
 
-  upward:               # Interest rate upward scenario
-    interest:
-      interest: 1.0
-      equity: 0.0
-      property: 0.0
-      spread: 0.0
-    equity:
-      interest: 0.0
-      equity: 1.0
-      property: 0.75
-      spread: 0.75
-    property:
-      interest: 0.0
-      equity: 0.75
-      property: 1.0
-      spread: 0.5
-    spread:
-      interest: 0.0
-      equity: 0.75
-      property: 0.5
-      spread: 1.0
+  upward:
+    labels: ["interest", "equity", "property", "spread"]
+    matrix:
+      - [1.0, 0.0, 0.0, 0.0]
+      - [0.0, 1.0, 0.75, 0.75]
+      - [0.0, 0.75, 1.0, 0.5]
+      - [0.0, 0.75, 0.5, 1.0]
 
 # ============================================
 #  ETF Universe (EUR-denominated)
 # ============================================
 etfs:
-  corporate_bond:
+  corp_bond:
     name: "iShares Euro Corporate Bond 1–5yr UCITS ETF"
     ticker: "IE15.L"
     category: "Fixed Income"
@@ -68,11 +40,11 @@ etfs:
     name: "iShares European Property Yield UCITS ETF"
     ticker: "EUNK.DE"
     category: "Real Estate"
-  equity_emerging:
+  equity_2:
     name: "iShares MSCI Emerging Markets UCITS ETF EUR (Dist)"
     ticker: "IQQE.DE"
     category: "Equity – Emerging"
-  equity_developed:
+  equity_1:
     name: "iShares MSCI World UCITS ETF EUR (Acc)"
     ticker: "EUNL.DE"
     category: "Equity – Developed"
