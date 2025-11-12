@@ -3,12 +3,16 @@ import requests
 import yfinance as yf
 from io import StringIO
 import numpy as np
+import os
 
-def load_eiopa_excel(path: str = "data/EIOPA_RFR_20251031_Term_Structures.xlsx") -> pd.DataFrame:
+
+def load_eiopa_excel(path: str = None) -> pd.DataFrame:
     """
-    Load EIOPA risk-free rate and shock data from the default Excel file,
-    unless a custom path is specified.
+    Load EIOPA risk-free rate and shock data from /data unless a custom path is given.
     """
+    if path is None:
+        ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        path = os.path.join(ROOT, "data", "EIOPA_RFR_20251031_Term_Structures.xlsx")
     xls = pd.ExcelFile(path)
     base  = pd.read_excel(xls, "RFR_spot_no_VA", usecols=[1, 2]).iloc[9:].reset_index(drop=True)
     up    = pd.read_excel(xls, "Spot_NO_VA_shock_UP", usecols=[2]).iloc[9:].reset_index(drop=True)
