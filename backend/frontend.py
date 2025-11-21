@@ -1679,6 +1679,34 @@ elif st.session_state["nav"] == "Results":
 
     st.markdown("---")
 
+    # Key changes with better formatting
+    st.markdown("**Key Allocation Changes:**")
+
+    changes = []
+    for i, label in enumerate(asset_labels):
+        current_w = initial_asset["asset_weight"].values[i] * 100
+        optimal_w = best["w_opt"][i] * 100
+        change = optimal_w - current_w
+
+        if abs(change) > 1.0:
+            if change > 0:
+                changes.append(f"🟢 **{label}**: ↑ {abs(change):.1f}pp ({current_w:.1f}% → {optimal_w:.1f}%)")
+            else:
+                changes.append(f"🔴 **{label}**: ↓ {abs(change):.1f}pp ({current_w:.1f}% → {optimal_w:.1f}%)")
+
+    if changes:
+        cols = st.columns(2)
+        mid = len(changes) // 2
+        with cols[0]:
+            for change in changes[:mid]:
+                st.markdown(change)
+        with cols[1]:
+            for change in changes[mid:]:
+                st.markdown(change)
+    else:
+        st.info("No significant allocation changes (< 1 percentage point)")
+    st.markdown("---")
+
     # Export/Download Section
     st.subheader("💾 Export Results")
 
@@ -2187,33 +2215,7 @@ elif st.session_state["nav"] == "Results":
 
         st.markdown("---")
 
-    # Key changes with better formatting
-    st.markdown("**Key Allocation Changes:**")
-
-    changes = []
-    for i, label in enumerate(asset_labels):
-        current_w = initial_asset["asset_weight"].values[i] * 100
-        optimal_w = best["w_opt"][i] * 100
-        change = optimal_w - current_w
-
-        if abs(change) > 1.0:
-            if change > 0:
-                changes.append(f"🟢 **{label}**: ↑ {abs(change):.1f}pp ({current_w:.1f}% → {optimal_w:.1f}%)")
-            else:
-                changes.append(f"🔴 **{label}**: ↓ {abs(change):.1f}pp ({current_w:.1f}% → {optimal_w:.1f}%)")
-
-    if changes:
-        cols = st.columns(2)
-        mid = len(changes) // 2
-        with cols[0]:
-            for change in changes[:mid]:
-                st.markdown(change)
-        with cols[1]:
-            for change in changes[mid:]:
-                st.markdown(change)
-    else:
-        st.info("No significant allocation changes (< 1 percentage point)")
-    st.markdown("---")
+    
 # --------------------------
 # INTERACTIVE PORTFOLIO SELECTOR PAGE
 # --------------------------
