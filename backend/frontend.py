@@ -884,6 +884,113 @@ elif st.session_state["nav"] == "Results":
             help="Assets - Liabilities"
         )
     st.markdown("---")
+    # --- MARGINAL SCR ANALYSIS SECTION ---
+
+st.subheader("🧮 Marginal SCR by Asset")
+
+try:
+    # Prepare SCR inputs using current portfolio
+    # 1. Run "component SCR" for current portfolio
+    from backend.config_loader import load_config, get_corr_matrices, get_solvency_params
+
+    cfg = load_config()
+    corr_down, corr_up = get_corr_matrices(cfg)
+    solv = get_solvency_params(cfg)
+
+    # Prepare SCR for each risk type (interest, equity, property, spread)
+    from backend.solvency_calc import (
+        scr_interest_rate, scr_eq, scr_prop, scr_sprd,
+        aggregate_market_scr, marginal_scr, allocate_marginal_scr
+    )
+
+    # Get asset values and durations
+    asset_values = initial_asset['asset_val']
+    asset_durs = initial_asset['asset_dur']
+    liab_value = st.session_state["liab_value"]
+    liab_duration = st.session_state.get("liab_duration", 6.6)
+    # Use params consistent with backend build process
+    params = {
+        "interest_down": best.get("interest_down", 0.009),
+        "interest_up": best.get("interest_up", 0.011),
+        "spread": best.get("spread", 0.103),
+        "equity_type1": solv["equity_1_param"],
+        "equity_type2": solv["equity_2_param"],
+        "property": solv["prop_params"],
+        "rho": solv["rho"],
+    }
+    
+    # Component SCRs (same as in notebook)
+    scr_interest = scr_interest_rate(
+        asset_values,
+        asset_durs,
+        liab_value,
+        liab_duration,
+        params["interest_up"],
+        params["interest_down"])
+    scr_equity = scr_eq(
+        asset_values.iloc[2],
+        asset_values.iloc[3],
+        params["equity_type1"],
+        params["equity_type2"],
+        params["rho"])
+    scr_property = scr_prop(asset_values.iloc[4], params["property"])
+    scr_spread = scr_sprd(asset_values.iloc[1], params["spread"])
+
+    # SCR vector
+    scr_vec = np.array([
+        scr_interest["SCR_interest"],
+        scr_equity["SCR_eq_total"],
+        scr_property,
+        scr_spread
+    ])
+
+    # Portfolio covariance used here for marginal SCR by risk type
+    marginal_df = marginal_scr(
+        v=scr_vec,
+        direction=best.get("chosen_panel", "downward"),  # Or use pre-configured
+        corr_downward=corr_down,
+        corr_upward=corr_up
+    )
+
+    # Asset-level marginal SCR allocation
+    asset_mSCR = allocate_marginal_scr(
+        marginal_df,
+        best.get("chosen_panel", "downward"),
+        initial_asset,
+        params
+    )
+
+    # For better UX, map keys to user-friendly names
+    ASSET_LABELS = ["Government Bonds", "Corporate Bonds",
+                    "Equity Type 1", "Equity Type 2",
+                    "Property", "Treasury Bills"]
+    asset_mSCR["Asset Class"] = ASSET_LABELS
+    asset_mSCR = asset_mSCR[["Asset Class", "mSCR"]]
+
+    # Show as table
+    st.dataframe(
+        asset_mSCR.style.format({"mSCR": "{:+.4f}"}),
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # Optional: horizontal bar chart
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(9, 4))
+    colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DFE6E9']
+    ax.barh(asset_mSCR["Asset Class"], asset_mSCR["mSCR"], color=colors)
+    ax.set_xlabel("Marginal SCR Contribution")
+    ax.set_title("Marginal SCR by Asset Class")
+    ax.axvline(0, color="grey", linewidth=1)
+    plt.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+
+    st.caption("Note: Marginal SCR represents the additional Solvency Capital Requirement from increasing exposure to each asset class, taking diversification into account. Units: proportional to portfolio size.")
+
+except Exception as ex:
+    st.error(f"Marginal SCR computation failed: {ex}")
+    st.markdown("---")
 
     # Sensitivity Analysis
     st.subheader("🔬 Sensitivity Analysis")
