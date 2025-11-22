@@ -13,7 +13,6 @@ from datetime import datetime, timedelta
 import json
 import openpyxl
 from io import BytesIO
-from backend.solvency_calc import marginal_scr, allocate_marginal_scr
 
 # --- Make project root importable ---
 FILE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -885,112 +884,192 @@ elif st.session_state["nav"] == "Results":
             help="Assets - Liabilities"
         )
     st.markdown("---")
-    # --- MARGINAL SCR ANALYSIS SECTION ---
 
-st.subheader("🧮 Marginal SCR by Asset")
+    # Duration Analysis
+    st.subheader("⚖️ Duration Analysis")
 
-try:
-    # Prepare SCR inputs using current portfolio
-    # 1. Run "component SCR" for current portfolio
-    from backend.config_loader import load_config, get_corr_matrices, get_solvency_params
-
-    cfg = load_config()
-    corr_down, corr_up = get_corr_matrices(cfg)
-    solv = get_solvency_params(cfg)
-
-    # Prepare SCR for each risk type (interest, equity, property, spread)
-    from backend.solvency_calc import (
-        scr_interest_rate, scr_eq, scr_prop, scr_sprd,
-        aggregate_market_scr, marginal_scr, allocate_marginal_scr
+    # Calculate current portfolio duration
+    current_dur = np.average(
+        initial_asset["asset_dur"].values,
+        weights=initial_asset["asset_weight"].values
     )
 
-    # Get asset values and durations
-    asset_values = initial_asset['asset_val']
-    asset_durs = initial_asset['asset_dur']
-    liab_value = st.session_state["liab_value"]
-    liab_duration = st.session_state.get("liab_duration", 6.6)
-    # Use params consistent with backend build process
-    params = {
-        "interest_down": best.get("interest_down", 0.009),
-        "interest_up": best.get("interest_up", 0.011),
-        "spread": best.get("spread", 0.103),
-        "equity_type1": solv["equity_1_param"],
-        "equity_type2": solv["equity_2_param"],
-        "property": solv["prop_params"],
-        "rho": solv["rho"],
-    }
-    
-    # Component SCRs (same as in notebook)
-    scr_interest = scr_interest_rate(
-        asset_values,
-        asset_durs,
-        liab_value,
-        liab_duration,
-        params["interest_up"],
-        params["interest_down"])
-    scr_equity = scr_eq(
-        asset_values.iloc[2],
-        asset_values.iloc[3],
-        params["equity_type1"],
-        params["equity_type2"],
-        params["rho"])
-    scr_property = scr_prop(asset_values.iloc[4], params["property"])
-    scr_spread = scr_sprd(asset_values.iloc[1], params["spread"])
-
-    # SCR vector
-    scr_vec = np.array([
-        scr_interest["SCR_interest"],
-        scr_equity["SCR_eq_total"],
-        scr_property,
-        scr_spread
-    ])
-
-    # Portfolio covariance used here for marginal SCR by risk type
-    marginal_df = marginal_scr(
-        v=scr_vec,
-        direction=best.get("chosen_panel", "downward"),  # Or use pre-configured
-        corr_downward=corr_down,
-        corr_upward=corr_up
+    # Calculate optimal portfolio duration
+    optimal_dur = np.average(
+        initial_asset["asset_dur"].values,
+        weights=best["w_opt"]
     )
 
-    # Asset-level marginal SCR allocation
-    asset_mSCR = allocate_marginal_scr(
-        marginal_df,
-        best.get("chosen_panel", "downward"),
-        initial_asset,
-        params
+    # Duration gap (portfolio duration - liability duration)
+    current_gap = current_dur - liab_duration
+    optimal_gap = optimal_dur - liab_duration
+
+    # Create columns for duration metrics
+    dur_col1, dur_col2, dur_col3, dur_col4 = st.columns(4)
+
+    with dur_col1:
+        st.metric(
+            "Liability Duration",
+            f"{liab_duration:.2f} years",
+            help="Modified duration of liabilities"
+        )
+
+    with dur_col2:
+        st.metric(
+            "Current Portfolio Duration",
+            f"{current_dur:.2f} years",
+            delta=f"{current_gap:+.2f} years gap",
+            delta_color="inverse",
+            help="Weighted average duration of current portfolio"
+        )
+
+    with dur_col3:
+        st.metric(
+            "Optimal Portfolio Duration",
+            f"{optimal_dur:.2f} years",
+            delta=f"{optimal_gap:+.2f} years gap",
+            delta_color="inverse",
+            help="Weighted average duration of optimal portfolio"
+        )
+
+    with dur_col4:
+        improvement = abs(current_gap) - abs(optimal_gap)
+        st.metric(
+            "Gap Improvement",
+            f"{improvement:.2f} years",
+            delta=f"{(improvement / abs(current_gap) * 100) if current_gap != 0 else 0:.1f}%",
+            help="Reduction in absolute duration gap"
+        )
+
+    # ✅ CHART OUTSIDE COLUMNS - NOW IT GETS FULL WIDTH
+    st.markdown("**Duration Matching Visualization**")
+
+    fig_dur, ax_dur = plt.subplots(figsize=(14, 7))
+
+    # Set style
+    ax_dur.set_facecolor('#f8f9fa')
+    fig_dur.patch.set_facecolor('white')
+
+    categories = ['Current\nPortfolio', 'Optimal\nPortfolio', 'Liabilities']
+    durations = [current_dur, optimal_dur, liab_duration]
+    colors = ['#FF6B6B', '#4ECDC4', '#95E1D3']
+
+    # Create bars with gradient effect
+    bars = ax_dur.bar(
+        categories,
+        durations,
+        color=colors,
+        alpha=0.85,
+        edgecolor='white',
+        linewidth=3,
+        width=0.65
     )
 
-    # For better UX, map keys to user-friendly names
-    ASSET_LABELS = ["Government Bonds", "Corporate Bonds",
-                    "Equity Type 1", "Equity Type 2",
-                    "Property", "Treasury Bills"]
-    asset_mSCR["Asset Class"] = ASSET_LABELS
-    asset_mSCR = asset_mSCR[["Asset Class", "mSCR"]]
+    # Add subtle shadow effect
+    for bar, color in zip(bars, colors):
+        bar.set_zorder(3)
+        ax_dur.bar(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height(),
+            width=bar.get_width(),
+            bottom=0,
+            color=color,
+            alpha=0.2,
+            zorder=2
+        )
 
-    # Show as table
-    st.dataframe(
-        asset_mSCR.style.format({"mSCR": "{:+.4f}"}),
-        use_container_width=True,
-        hide_index=True
+    # Add value labels on bars
+    for bar, dur in zip(bars, durations):
+        height = bar.get_height()
+        ax_dur.text(
+            bar.get_x() + bar.get_width() / 2.,
+            height + 0.2,
+            f'{dur:.2f}y',
+            ha='center',
+            va='bottom',
+            fontsize=14,
+            fontweight='bold',
+            bbox=dict(boxstyle='round,pad=0.6', facecolor='white', edgecolor='gray', alpha=0.85, linewidth=2)
+        )
+
+    # Add horizontal line for liability duration
+    ax_dur.axhline(
+        y=liab_duration,
+        color='#E74C3C',
+        linestyle='--',
+        linewidth=3,
+        alpha=0.7,
+        label='Target Duration',
+        zorder=1
     )
 
-    # Optional: horizontal bar chart
-    import matplotlib.pyplot as plt
+    # Styling
+    ax_dur.set_ylabel('Duration (years)', fontsize=14, fontweight='bold', color='#2c3e50')
+    ax_dur.set_title('Portfolio Duration vs Liability Duration', fontsize=16, fontweight='bold', pad=20,
+                     color='#2c3e50')
+    ax_dur.legend(fontsize=12, frameon=True, shadow=True, loc='upper right')
+    ax_dur.grid(axis='y', alpha=0.3, linestyle='--', linewidth=1.2)
 
-    fig, ax = plt.subplots(figsize=(9, 4))
-    colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DFE6E9']
-    ax.barh(asset_mSCR["Asset Class"], asset_mSCR["mSCR"], color=colors)
-    ax.set_xlabel("Marginal SCR Contribution")
-    ax.set_title("Marginal SCR by Asset Class")
-    ax.axvline(0, color="grey", linewidth=1)
+    # Remove spines
+    ax_dur.spines['top'].set_visible(False)
+    ax_dur.spines['right'].set_visible(False)
+    ax_dur.spines['left'].set_linewidth(2)
+    ax_dur.spines['bottom'].set_linewidth(2)
+
+    # Set y-axis to start from 0 with padding
+    ax_dur.set_ylim(0, max(durations) * 1.25)
+
+    # Increase tick label size
+    ax_dur.tick_params(axis='both', which='major', labelsize=11)
+
     plt.tight_layout()
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig_dur, use_container_width=True)
 
-    st.caption("Note: Marginal SCR represents the additional Solvency Capital Requirement from increasing exposure to each asset class, taking diversification into account. Units: proportional to portfolio size.")
+    # Interpretation text (also outside columns)
+    if abs(optimal_gap) < abs(current_gap):
+        st.success(
+            f"✅ **Improved Duration Matching**: The optimal portfolio reduces the duration gap "
+            f"from {abs(current_gap):.2f} years to {abs(optimal_gap):.2f} years, "
+            f"improving interest rate risk management."
+        )
+    elif abs(optimal_gap) > abs(current_gap):
+        st.warning(
+            f"⚠️ **Duration Gap Increased**: The optimal portfolio prioritizes return generation "
+            f"over duration matching, increasing the gap from {abs(current_gap):.2f} to "
+            f"{abs(optimal_gap):.2f} years. This may increase interest rate risk."
+        )
+    else:
+        st.info(
+            f"ℹ️ **Duration Gap Unchanged**: The optimal portfolio maintains a similar duration "
+            f"gap of {abs(optimal_gap):.2f} years."
+        )
 
-except Exception as ex:
-    st.error(f"Marginal SCR computation failed: {ex}")
+    # Detailed breakdown by asset class
+    with st.expander("📊 Duration Contribution by Asset Class"):
+        dur_contrib_df = pd.DataFrame({
+            "Asset Class": ["Government Bonds", "Corporate Bonds", "Equity Type 1",
+                            "Equity Type 2", "Property", "Treasury Bills"],
+            "Duration (years)": initial_asset["asset_dur"].values,
+            "Current Weight (%)": initial_asset["asset_weight"].values * 100,
+            "Current Contribution": initial_asset["asset_dur"].values * initial_asset["asset_weight"].values,
+            "Optimal Weight (%)": best["w_opt"] * 100,
+            "Optimal Contribution": initial_asset["asset_dur"].values * best["w_opt"]
+        })
+
+        st.dataframe(
+            dur_contrib_df.style.format({
+                "Duration (years)": "{:.2f}",
+                "Current Weight (%)": "{:.1f}",
+                "Current Contribution": "{:.3f}",
+                "Optimal Weight (%)": "{:.1f}",
+                "Optimal Contribution": "{:.3f}"
+            }),
+            use_container_width=True
+        )
+
+        st.caption("Note: Duration contribution = Duration × Weight. Sum of contributions = Portfolio Duration.")
+
+
     st.markdown("---")
 
     # Sensitivity Analysis
@@ -1787,34 +1866,6 @@ except Exception as ex:
 
     st.markdown("---")
 
-    # Key changes with better formatting
-    st.markdown("**Key Allocation Changes:**")
-
-    changes = []
-    for i, label in enumerate(asset_labels):
-        current_w = initial_asset["asset_weight"].values[i] * 100
-        optimal_w = best["w_opt"][i] * 100
-        change = optimal_w - current_w
-
-        if abs(change) > 1.0:
-            if change > 0:
-                changes.append(f"🟢 **{label}**: ↑ {abs(change):.1f}pp ({current_w:.1f}% → {optimal_w:.1f}%)")
-            else:
-                changes.append(f"🔴 **{label}**: ↓ {abs(change):.1f}pp ({current_w:.1f}% → {optimal_w:.1f}%)")
-
-    if changes:
-        cols = st.columns(2)
-        mid = len(changes) // 2
-        with cols[0]:
-            for change in changes[:mid]:
-                st.markdown(change)
-        with cols[1]:
-            for change in changes[mid:]:
-                st.markdown(change)
-    else:
-        st.info("No significant allocation changes (< 1 percentage point)")
-    st.markdown("---")
-
     # Export/Download Section
     st.subheader("💾 Export Results")
 
@@ -2323,7 +2374,33 @@ except Exception as ex:
 
         st.markdown("---")
 
-    
+    # Key changes with better formatting
+    st.markdown("**Key Allocation Changes:**")
+
+    changes = []
+    for i, label in enumerate(asset_labels):
+        current_w = initial_asset["asset_weight"].values[i] * 100
+        optimal_w = best["w_opt"][i] * 100
+        change = optimal_w - current_w
+
+        if abs(change) > 1.0:
+            if change > 0:
+                changes.append(f"🟢 **{label}**: ↑ {abs(change):.1f}pp ({current_w:.1f}% → {optimal_w:.1f}%)")
+            else:
+                changes.append(f"🔴 **{label}**: ↓ {abs(change):.1f}pp ({current_w:.1f}% → {optimal_w:.1f}%)")
+
+    if changes:
+        cols = st.columns(2)
+        mid = len(changes) // 2
+        with cols[0]:
+            for change in changes[:mid]:
+                st.markdown(change)
+        with cols[1]:
+            for change in changes[mid:]:
+                st.markdown(change)
+    else:
+        st.info("No significant allocation changes (< 1 percentage point)")
+    st.markdown("---")
 # --------------------------
 # INTERACTIVE PORTFOLIO SELECTOR PAGE
 # --------------------------
