@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from data_handler import (
+from backend.data_handler import (
     load_eiopa_excel,
     interpolate_shocks,
     spread_shock,

@@ -112,3 +112,46 @@ def plot_frontier(opt_df: pd.DataFrame,
 
     return fig, ax
 
+
+# --------------------------
+# Plotting Helper Function
+# --------------------------
+def plot_scenario_comparison(opt_df, base_best, sens_best, current_ret, current_sol):
+    """Generates a comparison plot showing Base Optimal, Current, and New Scenario Optimal."""
+    fig, ax = plt.subplots(figsize=(12, 7))
+    ax.set_facecolor('#f8f9fa')
+    fig.patch.set_facecolor('white')
+
+    # 1. Efficient Frontier Line
+    ax.plot(opt_df["solvency"] * 100, opt_df["return"] * 100, '-',
+            color='#4ECDC4', linewidth=2.5, alpha=0.4, label='Base Efficient Frontier', zorder=1)
+
+    # 2. Base Optimal Portfolio (Star)
+    ax.scatter(base_best["solvency"] * 100, base_best["return"] * 100, s=400, c='#FFD700', marker='*',
+               edgecolors='#FF8C00', linewidth=2, label='Base Optimal Portfolio', zorder=5)
+
+    # 3. Current Portfolio (Diamond)
+    ax.scatter(current_sol * 100, current_ret * 100, s=250, c='#E74C3C', marker='D',
+               edgecolors='#C0392B', linewidth=2, label='Current Portfolio', zorder=4)
+
+    # 4. New Scenario Optimal Portfolio (Triangle - Primary Focus)
+    sens_sol = sens_best["solvency"] * 100
+    sens_ret = sens_best["return"] * 100
+    ax.scatter(sens_sol, sens_ret, s=400, c='#9B59B6', marker='^',
+               edgecolors='#6C3483', linewidth=3, label='Scenario Optimal Portfolio', zorder=6)
+
+    # Add annotation for New Scenario
+    ax.annotate(f'NEW OPTIMAL\n{sens_ret:.2f}% | {sens_sol:.1f}%',
+                xy=(sens_sol, sens_ret), xytext=(-50, 40),
+                textcoords='offset points', fontsize=10, fontweight='bold',
+                bbox=dict(boxstyle='round,pad=0.6', facecolor='#9B59B6', edgecolor='#6C3483', alpha=0.9),
+                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=-0.2', color='#6C3483', lw=2), zorder=6)
+
+    # Styling
+    ax.set_xlabel('Solvency Ratio (%)', fontsize=12)
+    ax.set_ylabel('Expected Return (%)', fontsize=12)
+    ax.set_title('Scenario Comparison: Optimal Portfolios', fontsize=15)
+    ax.grid(True, alpha=0.25, linestyle='--')
+    ax.legend(loc='lower right', frameon=True, shadow=True)
+
+    return fig
