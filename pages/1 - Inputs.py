@@ -464,16 +464,27 @@ if st.button("🚀 Optimize Portfolio", disabled=not can_optimize, type="primary
             opt_df = solve_frontier_combined(
                 initial_asset, liab_value, liab_duration, corr_down, corr_up, allocation_limits, params
             )
+            # === NEW ERROR CHECK ===
+            if opt_df.empty:
+                st.error("❌ Optimization failed: No feasible portfolios found.")
+                st.warning("""
+                            **Possible causes:**
+                            1. **Solvency Constraint:** It might be mathematically impossible to achieve a 100% Solvency Ratio with the current Assets & Liabilities.
+                            2. **Constraints:** Your Min/Max allocation limits might be too restrictive.
+                            3. **Shocks:** The computed shocks might be too severe for the available capital.
+                            """)
+                # Prevent navigating to results
+                st.session_state["optimization_run"] = False
+            else:
+                # 4. STORE RESULTS (Only if successful)
+                st.session_state["opt_df"] = opt_df
+                st.session_state["initial_asset"] = initial_asset
+                st.session_state["liab_value"] = liab_value
+                st.session_state["liab_duration"] = liab_duration
+                st.session_state["auto_calculated"] = use_auto_params
+                st.session_state["optimization_run"] = True
 
-            # 4. STORE RESULTS
-            st.session_state["opt_df"] = opt_df
-            st.session_state["initial_asset"] = initial_asset
-            st.session_state["liab_value"] = liab_value
-            st.session_state["liab_duration"] = liab_duration
-            st.session_state["auto_calculated"] = use_auto_params
-            st.session_state["optimization_run"] = True
-
-            st.success("✅ Optimization completed successfully! Navigate to 'Results' page.")
+                st.success("✅ Optimization completed successfully! Navigate to 'Results' page.")
 
         except Exception as e:
             st.error(f"❌ Optimization failed: {str(e)}")
