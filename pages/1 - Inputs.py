@@ -25,7 +25,7 @@ from backend.data_calculator import (
 
 st.set_page_config(page_title="Inputs - Solvency II Optimizer", layout="wide")
 
-
+apply_sidebar_style()
 
 # --------------------------
 # Helper Functions
@@ -131,7 +131,7 @@ def build_backend_inputs(A_gov, A_corp, A_eq1, A_eq2, A_prop, A_tb, total_A,
 # --------------------------
 
 st.title("🏦 Solvency II Asset Allocation Optimizer")
-apply_sidebar_style()
+
 st.markdown("---")
 
 # Auto-calculate toggle
