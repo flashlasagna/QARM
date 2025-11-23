@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
-
+from backend.style_utils import apply_sidebar_style
 
 # --- Path Setup ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,45 +25,6 @@ from backend.data_calculator import (
 
 st.set_page_config(page_title="Inputs - Solvency II Optimizer", layout="wide")
 
-# === ADD THIS BLOCK HERE ===
-st.markdown("""
-    <style>
-    /* --- SIDEBAR STYLING --- */
-    [data-testid="stSidebar"] {
-        background-color: #f8fafc;
-        border-right: 1px solid #e2e8f0;
-    }
-    [data-testid="stSidebarNav"] {
-        padding-top: 1rem;
-    }
-    [data-testid="stSidebarNav"] a {
-        background-color: transparent;
-        border-radius: 8px;
-        margin-bottom: 8px;
-        padding: 12px 15px;
-        transition: all 0.2s ease-in-out;
-        border: 1px solid transparent;
-    }
-    [data-testid="stSidebarNav"] a:hover {
-        background-color: #eef2ff;
-        border: 1px solid #cbd5e1;
-        transform: translateX(5px);
-    }
-    [data-testid="stSidebarNav"] [aria-current="page"] {
-        background-color: #dbeafe;
-        border: 1px solid #3b82f6;
-        font-weight: 700;
-    }
-    [data-testid="stSidebarNav"] span {
-        font-size: 1.1rem !important;
-        font-weight: 500;
-        color: #334155;
-    }
-    section[data-testid="stSidebar"] > div:first-child {
-        padding-top: 2rem;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
 
 # --------------------------
@@ -170,6 +131,7 @@ def build_backend_inputs(A_gov, A_corp, A_eq1, A_eq2, A_prop, A_tb, total_A,
 # --------------------------
 
 st.title("🏦 Solvency II Asset Allocation Optimizer")
+apply_sidebar_style()
 st.markdown("---")
 
 # Auto-calculate toggle
