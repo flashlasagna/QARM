@@ -15,9 +15,9 @@ if root_dir not in sys.path:
 
 st.set_page_config(page_title="Interactive Selector", layout="wide")
 
-st.title("🎚️ Interactive Portfolio Selector")
-
 apply_sidebar_style()
+
+st.title("🎚️ Interactive Portfolio Selector")
 
 st.markdown("Explore different risk-return tradeoffs along the efficient frontier by selecting alternative portfolios.")
 
