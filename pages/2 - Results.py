@@ -7,10 +7,7 @@ from io import BytesIO
 import json
 import os
 import sys
-from backend.helpers import plot_scenario_comparison
-from backend.data_calculator import (
-    compute_ir_shocks_from_eiopa,
-    compute_spread_shock_eiopa
+
 )
 
 # --- Path Setup ---
@@ -23,6 +20,10 @@ if root_dir not in sys.path:
 from backend.config_loader import load_config, get_corr_matrices, get_solvency_params
 from backend.optimization import solve_frontier_combined
 from backend.helpers import summarize_portfolio
+from backend.helpers import plot_scenario_comparison
+from backend.data_calculator import (
+    compute_ir_shocks_from_eiopa,
+    compute_spread_shock_eiopa
 
 st.title("📈 Optimization Results")
 
