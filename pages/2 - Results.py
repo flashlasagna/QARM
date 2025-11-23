@@ -851,7 +851,7 @@ with sens_tab1:
                     st.error(f"Error in shock sensitivity: {str(e)}")
                     st.exception(e)
 
-# ==========================================
+    # ==========================================
     # TAB 3: Custom Scenario
     # ==========================================
     with sens_tab3:
