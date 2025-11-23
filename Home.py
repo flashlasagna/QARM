@@ -26,25 +26,55 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-apply_sidebar_style()
-
-# Custom CSS for professional appearance that adapts to Light/Dark mode automatically
 st.markdown("""
     <style>
-    /* Global font styling */
+    /* --- SIDEBAR STYLING (Integrated) --- */
+    [data-testid="stSidebar"] {
+        background-color: rgba(128, 128, 128, 0.05);
+        border-right: 1px solid rgba(128, 128, 128, 0.1);
+    }
+    [data-testid="stSidebarNav"] {
+        padding-top: 1rem;
+    }
+    [data-testid="stSidebarNav"] a {
+        background-color: transparent;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        padding: 12px 15px;
+        transition: all 0.2s ease-in-out;
+        border: 1px solid transparent;
+        color: inherit;
+    }
+    [data-testid="stSidebarNav"] a:hover {
+        background-color: rgba(128, 128, 128, 0.1);
+        border: 1px solid rgba(128, 128, 128, 0.2);
+        transform: translateX(5px);
+    }
+    [data-testid="stSidebarNav"] [aria-current="page"] {
+        background-color: rgba(59, 130, 246, 0.15);
+        border: 1px solid #3b82f6;
+        font-weight: 700;
+    }
+    [data-testid="stSidebarNav"] span {
+        font-size: 1.1rem !important;
+        font-weight: 500;
+        color: inherit;
+    }
+    section[data-testid="stSidebar"] > div:first-child {
+        padding-top: 2rem;
+    }
+
+    /* --- HOME PAGE CONTENT STYLING --- */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
     html, body, [class*="css"] {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
-    /* REMOVED: Fixed background colors. Now inherits from Streamlit theme. */
-
-    /* Main title styling */
     .main-title {
         font-size: 3rem;
         font-weight: 700;
-        color: inherit; /* Adapts to dark/light theme automatically */
+        color: inherit;
         margin-bottom: 0.5rem;
         letter-spacing: -0.02em;
     }
@@ -52,7 +82,7 @@ st.markdown("""
     .subtitle {
         font-size: 1.4rem;
         color: inherit;
-        opacity: 0.8; /* Uses opacity instead of fixed grey for contrast */
+        opacity: 0.8;
         margin-bottom: 1.5rem;
         font-weight: 400;
         line-height: 1.6;
@@ -66,9 +96,8 @@ st.markdown("""
         max-width: 95%;
     }
 
-    /* Navigation box styling */
+    /* Navigation box */
     .nav-box {
-        /* Transparent grey background - looks good on white AND black */
         background-color: rgba(128, 128, 128, 0.1); 
         border-radius: 8px;
         padding: 1.5rem;
@@ -106,12 +135,11 @@ st.markdown("""
         letter-spacing: -0.01em;
     }
 
-    /* Team section styling */
+    /* Team section */
     .team-category {
         font-size: 1.4rem;
         font-weight: 700;
-        /* Brighter blue that is legible on both dark and light backgrounds */
-        color: #60a5fa; 
+        color: #60a5fa;
         margin-top: 2rem;
         margin-bottom: 1.2rem;
         letter-spacing: -0.01em;
@@ -135,7 +163,7 @@ st.markdown("""
         font-style: italic;
     }
 
-    /* Key metrics styling */
+    /* Metrics */
     .metric-box {
         background-color: rgba(128, 128, 128, 0.1);
         border-radius: 8px;
@@ -147,7 +175,7 @@ st.markdown("""
     .metric-value {
         font-size: 2rem;
         font-weight: 700;
-        color: #60a5fa; /* Bright blue */
+        color: #60a5fa;
         margin-bottom: 0.25rem;
     }
 
@@ -160,44 +188,40 @@ st.markdown("""
         letter-spacing: 0.05em;
     }
 
-    /* Tab content styling */
+    /* Tab Styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
-
     .stTabs [data-baseweb="tab"] {
         padding: 0.75rem 1.5rem;
         font-weight: 500;
         color: inherit;
         opacity: 0.7;
     }
-
     .stTabs [data-baseweb="tab"]:hover {
         opacity: 1;
     }
 
     /* Info box */
     .info-box {
-        /* Semi-transparent blue background */
         background-color: rgba(59, 130, 246, 0.1); 
         border-left: 4px solid #3b82f6;
         padding: 1rem 1.25rem;
         border-radius: 6px;
         margin: 1.5rem 0;
     }
-
     .info-box p {
         color: inherit;
         margin: 0;
         line-height: 1.6;
     }
 
-    /* General Text overrides to ensure nothing is hidden */
+    /* Overrides */
     p, span, div, h1, h2, h3, h4, h5, h6, li {
         color: inherit;
     }
 
-    /* Footer styling */
+    /* Footer */
     .footer {
         margin-top: 4rem;
         padding-top: 2rem;
