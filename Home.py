@@ -1,7 +1,9 @@
 import streamlit as st
+from backend.style_utils import apply_sidebar_style
+apply_sidebar_style()
 import os
 import sys
-from backend.style_utils import apply_sidebar_style
+
 
 
 # --- Session State Initialization ---
@@ -28,42 +30,6 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    /* --- SIDEBAR STYLING (Integrated) --- */
-    [data-testid="stSidebar"] {
-        background-color: rgba(128, 128, 128, 0.05);
-        border-right: 1px solid rgba(128, 128, 128, 0.1);
-    }
-    [data-testid="stSidebarNav"] {
-        padding-top: 1rem;
-    }
-    [data-testid="stSidebarNav"] a {
-        background-color: transparent;
-        border-radius: 8px;
-        margin-bottom: 8px;
-        padding: 12px 15px;
-        transition: all 0.2s ease-in-out;
-        border: 1px solid transparent;
-        color: inherit;
-    }
-    [data-testid="stSidebarNav"] a:hover {
-        background-color: rgba(128, 128, 128, 0.1);
-        border: 1px solid rgba(128, 128, 128, 0.2);
-        transform: translateX(5px);
-    }
-    [data-testid="stSidebarNav"] [aria-current="page"] {
-        background-color: rgba(59, 130, 246, 0.15);
-        border: 1px solid #3b82f6;
-        font-weight: 700;
-    }
-    [data-testid="stSidebarNav"] span {
-        font-size: 1.1rem !important;
-        font-weight: 500;
-        color: inherit;
-    }
-    section[data-testid="stSidebar"] > div:first-child {
-        padding-top: 2rem;
-    }
-
     /* --- HOME PAGE CONTENT STYLING --- */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
