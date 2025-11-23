@@ -50,6 +50,10 @@ if "opt_df" in st.session_state:
 
     # FIX: Explicitly define liab_duration here
     liab_duration = st.session_state["liab_duration"]
+    # === INSERT DEBUG HERE ===
+    st.write(f"DEBUG CHECK - Duration: {liab_duration} (Type: {type(liab_duration)})")
+    st.write(f"DEBUG CHECK - Value: {liab_value} (Type: {type(liab_value)})")
+    # =========================
 else:
     # Handle missing data gracefully if needed
     st.info("Optimization data not fully loaded.")
