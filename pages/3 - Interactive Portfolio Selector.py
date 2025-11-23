@@ -1,11 +1,13 @@
 import streamlit as st
+from backend.style_utils import apply_sidebar_style
+st.set_page_config(page_title="Results", layout="wide")
+apply_sidebar_style()
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import os, sys
 from datetime import datetime
 import json
-from backend.style_utils import apply_sidebar_style
 
 # --- Path Setup ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -13,9 +15,6 @@ root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
-st.set_page_config(page_title="Interactive Selector", layout="wide")
-
-apply_sidebar_style()
 
 st.title("🎚️ Interactive Portfolio Selector")
 
