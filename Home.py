@@ -1,12 +1,8 @@
 import streamlit as st
 import os
 import sys
+from backend.style_utils import apply_sidebar_style
 
-# --- Page Config ---
-st.set_page_config(
-    page_title="Solvency II Asset Allocation Optimizer",
-    layout="wide"
-)
 
 # --- Session State Initialization ---
 # We initialize these to ensure they exist across all pages
@@ -211,6 +207,8 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+apply_sidebar_style()
 # ============================================================================
 # HEADER SECTION
 # ============================================================================
