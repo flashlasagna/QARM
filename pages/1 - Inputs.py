@@ -501,6 +501,7 @@ if st.button("🚀 Optimize Portfolio", disabled=not can_optimize, type="primary
                 st.session_state["liab_duration"] = liab_duration
                 st.session_state["auto_calculated"] = use_auto_params
                 st.session_state["optimization_run"] = True
+                st.session_state["params"] = params  # Save the exact shocks used
 
                 st.success("✅ Optimization completed successfully! Navigate to 'Results' page.")
 
