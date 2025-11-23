@@ -22,7 +22,7 @@ from backend.helpers import summarize_portfolio
 from backend.helpers import plot_scenario_comparison
 from backend.data_calculator import (
     compute_ir_shocks_from_eiopa,
-    compute_spread_shock_eiopa
+    compute_spread_shock_eiopa)
 
 st.title("📈 Optimization Results")
 
