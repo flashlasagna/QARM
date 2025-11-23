@@ -650,7 +650,7 @@ with sens_tab1:
                 }
 
                 sens_opt_df = solve_frontier_combined(
-                    initial_asset=sens_asset, liab_value=liab_value, liab_duration=liab_value,
+                    initial_asset=sens_asset, liab_value=liab_value, liab_duration=liab_duration,
                     # Using liab_value as placeholder for actual liab_duration
                     corr_downward=corr_down, corr_upward=corr_up, allocation_limits=allocation_limits, params=params
                 )
