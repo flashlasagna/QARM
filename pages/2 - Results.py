@@ -662,7 +662,7 @@ with sens_tab1:
 
                     # --- NEW PLOT GENERATION ---
                     st.subheader("Scenario Optimal Portfolio Comparison")
-                    fig = plot_scenario_comparison(opt_df, best, sens_best, current_ret, current_sol)
+                    fig = plot_scenario_comparison(opt_df, best, sens_best, current_ret, current_sol, sens_df=sens_opt_df)
                     st.pyplot(fig, use_container_width=True)
 
                     # Comparison Metrics
@@ -791,7 +791,7 @@ with sens_tab1:
 
                     # --- NEW PLOT GENERATION ---
                     st.subheader("Scenario Optimal Portfolio Comparison")
-                    fig = plot_scenario_comparison(opt_df, best, sens_best, current_ret, current_sol)
+                    fig = plot_scenario_comparison(opt_df, best, sens_best, current_ret, current_sol, sens_df=sens_opt_df)
                     st.pyplot(fig, use_container_width=True)
 
                     st.markdown("**Impact of Changed Shocks**")
@@ -852,7 +852,7 @@ with sens_tab1:
                     st.error(f"Error in shock sensitivity: {str(e)}")
                     st.exception(e)
 
-    # ==========================================
+# ==========================================
     # TAB 3: Custom Scenario
     # ==========================================
     with sens_tab3:
@@ -863,46 +863,52 @@ with sens_tab1:
 
         with col1:
             st.markdown("**📊 Custom Returns**")
-            custom_r_gov = st.number_input("Gov Bonds Return", 0.0, 0.20, 0.029, 0.001, format="%.3f",
-                                           key="custom_r_gov")
-            custom_r_corp = st.number_input("Corp Bonds Return", 0.0, 0.20, 0.041, 0.001, format="%.3f",
-                                            key="custom_r_corp")
-            custom_r_eq1 = st.number_input("Equity 1 Return", 0.0, 0.20, 0.064, 0.001, format="%.3f",
-                                           key="custom_r_eq1")
-            custom_r_eq2 = st.number_input("Equity 2 Return", 0.0, 0.20, 0.064, 0.001, format="%.3f",
-                                           key="custom_r_eq2")
-            custom_r_prop = st.number_input("Property Return", 0.0, 0.20, 0.056, 0.001, format="%.3f",
-                                            key="custom_r_prop")
-            custom_r_tb = st.number_input("T-Bills Return", 0.0, 0.20, 0.006, 0.001, format="%.3f", key="custom_r_tb")
+            # Initialize with current asset returns as defaults
+            defaults = initial_asset["asset_ret"].values
+            custom_r_gov = st.number_input("Gov Bonds Return", -0.10, 0.20, float(defaults[0]), 0.001, format="%.3f", key="c_r_gov")
+            custom_r_corp = st.number_input("Corp Bonds Return", -0.10, 0.20, float(defaults[1]), 0.001, format="%.3f", key="c_r_corp")
+            custom_r_eq1 = st.number_input("Equity 1 Return", -0.10, 0.20, float(defaults[2]), 0.001, format="%.3f", key="c_r_eq1")
+            custom_r_eq2 = st.number_input("Equity 2 Return", -0.10, 0.20, float(defaults[3]), 0.001, format="%.3f", key="c_r_eq2")
+            custom_r_prop = st.number_input("Property Return", -0.10, 0.20, float(defaults[4]), 0.001, format="%.3f", key="c_r_prop")
+            custom_r_tb = st.number_input("T-Bills Return", -0.10, 0.20, float(defaults[5]), 0.001, format="%.3f", key="c_r_tb")
 
         with col2:
             st.markdown("**⚡ Custom Shocks**")
-            custom_ir_up = st.number_input("IR Up Shock", 0.0, 0.05, 0.011, 0.001, format="%.3f", key="custom_ir_up")
-            custom_ir_down = st.number_input("IR Down Shock", 0.0, 0.05, 0.009, 0.001, format="%.3f",
-                                             key="custom_ir_down")
-            custom_eq1 = st.number_input("Equity 1 Shock", 0.0, 1.0, 0.39, 0.01, format="%.2f", key="custom_eq1")
-            custom_eq2 = st.number_input("Equity 2 Shock", 0.0, 1.0, 0.49, 0.01, format="%.2f", key="custom_eq2")
-            custom_prop = st.number_input("Property Shock", 0.0, 1.0, 0.25, 0.01, format="%.2f", key="custom_prop")
-            custom_spread = st.number_input("Spread Shock", 0.0, 0.30, 0.103, 0.001, format="%.3f", key="custom_spread")
+            # Load default parameters from config/session for defaults
+            cfg = load_config()
+            solv = get_solvency_params(cfg)
+            
+            # Use session state if available (from auto-calc), else defaults
+            # Ideally these should come from st.session_state if stored in Inputs.py
+            # Here we use safe defaults or previously computed values if possible
+            
+            custom_ir_up = st.number_input("IR Up Shock", 0.0, 0.20, 0.011, 0.001, format="%.3f", key="c_ir_up")
+            custom_ir_down = st.number_input("IR Down Shock", 0.0, 0.20, 0.009, 0.001, format="%.3f", key="c_ir_down")
+            custom_spread = st.number_input("Spread Shock", 0.0, 0.30, 0.103, 0.001, format="%.3f", key="c_spread")
+            
+            custom_eq1 = st.number_input("Equity 1 Shock", 0.0, 1.0, solv["equity_1_param"], 0.01, format="%.2f", key="c_eq1")
+            custom_eq2 = st.number_input("Equity 2 Shock", 0.0, 1.0, solv["equity_2_param"], 0.01, format="%.2f", key="c_eq2")
+            custom_prop = st.number_input("Property Shock", 0.0, 1.0, solv["prop_params"], 0.01, format="%.2f", key="c_prop")
 
         if st.button("🚀 Run Custom Scenario", key="run_custom_sens", type="primary"):
             with st.spinner("Running custom scenario analysis..."):
                 try:
-                    # Build custom asset and params
+                    # 1. Build Custom Inputs
                     custom_asset = initial_asset.copy()
                     custom_asset["asset_ret"] = [custom_r_gov, custom_r_corp, custom_r_eq1,
                                                  custom_r_eq2, custom_r_prop, custom_r_tb]
 
-                    cfg = load_config()
+                    # Re-load matrices
                     corr_down, corr_up = get_corr_matrices(cfg)
-                    solv = get_solvency_params(cfg)
 
+                    # Build Allocation Limits (Same as base case)
                     allocation_limits = pd.DataFrame({
                         "asset": ["gov_bond", "illiquid_assets", "t_bills", "corp_bond"],
                         "min_weight": [0.25, 0.0, 0.01, 0.0],
                         "max_weight": [0.75, 0.20, 0.05, 0.50],
                     }).set_index("asset")
 
+                    # Build Params Dictionary
                     custom_params = {
                         "interest_down": custom_ir_down,
                         "interest_up": custom_ir_up,
@@ -913,6 +919,7 @@ with sens_tab1:
                         "rho": solv["rho"],
                     }
 
+                    # 2. Run Optimization
                     custom_opt_df = solve_frontier_combined(
                         initial_asset=custom_asset,
                         liab_value=liab_value,
@@ -923,57 +930,66 @@ with sens_tab1:
                         params=custom_params
                     )
 
-                    custom_best_idx = custom_opt_df["objective"].idxmax()
-                    custom_best = custom_opt_df.loc[custom_best_idx]
+                    if not custom_opt_df.empty:
+                        custom_best_idx = custom_opt_df["objective"].idxmax()
+                        custom_best = custom_opt_df.loc[custom_best_idx]
 
-                    st.success("✓ Custom scenario completed!")
+                        st.success("✓ Custom scenario completed!")
 
-                    # --- NEW PLOT GENERATION ---
-                    st.subheader("Scenario Optimal Portfolio Comparison")
-                    fig = plot_scenario_comparison(opt_df, best, sens_best, current_ret, current_sol)
-                    st.pyplot(fig, use_container_width=True)
+                        # --- A. PLOT SCENARIO COMPARISON ---
+                        st.subheader("Scenario Optimal Portfolio Comparison")
+                        # Pass 'sens_df=custom_opt_df' to see the new frontier line
+                        fig = plot_scenario_comparison(opt_df, best, custom_best, current_ret, current_sol, sens_df=custom_opt_df)
+                        st.pyplot(fig, use_container_width=True)
 
-                    # Full comparison table
-                    st.markdown("**Comprehensive Comparison**")
+                        # --- B. KEY METRICS ---
+                        st.markdown("**Impact of Custom Assumptions**")
+                        col_m1, col_m2, col_m3 = st.columns(3)
+                        
+                        with col_m1:
+                            st.metric(
+                                "Expected Return", 
+                                f"{custom_best['return']:.2%}", 
+                                f"{(custom_best['return'] - best_ret):.2%}"
+                            )
+                        with col_m2:
+                            st.metric(
+                                "Solvency Ratio", 
+                                f"{custom_best['solvency']*100:.1f}%", 
+                                f"{(custom_best['solvency'] - best_sol)*100:.1f}pp"
+                            )
+                        with col_m3:
+                            st.metric(
+                                "SCR Market", 
+                                f"€{custom_best['SCR_market']:.1f}m", 
+                                f"€{(custom_best['SCR_market'] - best_SCR):.1f}m",
+                                delta_color="inverse"
+                            )
 
-                    metrics_comparison = pd.DataFrame({
-                        "Metric": ["Expected Return", "SCR Market (€m)", "Solvency Ratio (%)", "BOF (€m)"],
-                        "Base Case": [
-                            f"{best['return']:.2%}",
-                            f"{best['SCR_market']:.1f}",
-                            f"{best['solvency'] * 100:.1f}",
-                            f"{best['BOF']:.1f}"
-                        ],
-                        "Custom Scenario": [
-                            f"{custom_best['return']:.2%}",
-                            f"{custom_best['SCR_market']:.1f}",
-                            f"{custom_best['solvency'] * 100:.1f}",
-                            f"{custom_best['BOF']:.1f}"
-                        ]
-                    })
+                        # --- C. ALLOCATION CHANGE ---
+                        st.markdown("**Asset Allocation Response**")
+                        
+                        alloc_comparison = pd.DataFrame({
+                            "Asset Class": ["Gov Bonds", "Corp Bonds", "Equity Type 1",
+                                            "Equity Type 2", "Property", "T-Bills"],
+                            "Base Case (%)": best["w_opt"] * 100,
+                            "Custom Case (%)": custom_best["w_opt"] * 100,
+                            "Change (pp)": (custom_best["w_opt"] - best["w_opt"]) * 100
+                        })
 
-                    st.dataframe(metrics_comparison, use_container_width=True, hide_index=True)
-
-                    st.markdown("**Allocation Comparison**")
-
-                    alloc_comparison = pd.DataFrame({
-                        "Asset": ["Gov Bonds", "Corp Bonds", "Equity Type 1",
-                                  "Equity Type 2", "Property", "T-Bills"],
-                        "Base (%)": best["w_opt"] * 100,
-                        "Custom (%)": custom_best["w_opt"] * 100,
-                        "Δ (pp)": (custom_best["w_opt"] - best["w_opt"]) * 100
-                    })
-
-                    st.dataframe(
-                        alloc_comparison.style.format({
-                            "Base (%)": "{:.1f}",
-                            "Custom (%)": "{:.1f}",
-                            "Δ (pp)": "{:+.1f}"
-                        }).background_gradient(subset=["Δ (pp)"], cmap="RdYlGn", vmin=-20, vmax=20),
-                        use_container_width=True
-                    )
+                        st.dataframe(
+                            alloc_comparison.style.format({
+                                "Base Case (%)": "{:.1f}",
+                                "Custom Case (%)": "{:.1f}",
+                                "Change (pp)": "{:+.1f}"
+                            }).background_gradient(subset=["Change (pp)"], cmap="RdYlGn", vmin=-10, vmax=10),
+                            use_container_width=True
+                        )
+                        
+                    else:
+                        st.error("❌ Optimization failed for this custom scenario. Try relaxing constraints or improving returns.")
 
                 except Exception as e:
                     st.error(f"Error in custom scenario: {str(e)}")
-                    st.exception(e)
+                    # st.exception(e) # Uncomment for debugging
     st.markdown("---")
