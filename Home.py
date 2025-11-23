@@ -30,7 +30,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for professional, consulting-style appearance that respects Dark/Light mode
+# Custom CSS for professional appearance that adapts to Light/Dark mode automatically
 st.markdown("""
     <style>
     /* Global font styling */
@@ -40,22 +40,21 @@ st.markdown("""
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
-    /* REMOVED: Force light background sections (.main, .stApp) */
-    /* Streamlit will now handle background colors automatically */
+    /* REMOVED: Fixed background colors. Now inherits from Streamlit theme. */
 
     /* Main title styling */
     .main-title {
         font-size: 3rem;
         font-weight: 700;
-        /* Color removed to inherit from theme */
+        color: inherit; /* Adapts to dark/light theme automatically */
         margin-bottom: 0.5rem;
         letter-spacing: -0.02em;
     }
 
     .subtitle {
         font-size: 1.4rem;
-        /* Use a semi-transparent version of the text color for theme adaptability */
-        opacity: 0.8; 
+        color: inherit;
+        opacity: 0.8; /* Uses opacity instead of fixed grey for contrast */
         margin-bottom: 1.5rem;
         font-weight: 400;
         line-height: 1.6;
@@ -63,6 +62,7 @@ st.markdown("""
 
     .intro-text {
         font-size: 1.05rem;
+        color: inherit;
         line-height: 1.8;
         margin-bottom: 2.5rem;
         max-width: 95%;
@@ -70,17 +70,18 @@ st.markdown("""
 
     /* Navigation box styling */
     .nav-box {
-        /* Use a slightly transparent background to work on both dark and light */
-        background-color: rgba(128, 128, 128, 0.05); 
-        border: 1px solid rgba(128, 128, 128, 0.1);
+        /* Transparent grey background - looks good on white AND black */
+        background-color: rgba(128, 128, 128, 0.1); 
         border-radius: 8px;
         padding: 1.5rem;
         margin-bottom: 1rem;
+        border: 1px solid rgba(128, 128, 128, 0.2);
     }
 
     .nav-title {
         font-size: 1.25rem;
         font-weight: 600;
+        color: inherit;
         margin-bottom: 0.75rem;
     }
 
@@ -90,13 +91,18 @@ st.markdown("""
         line-height: 1.8;
     }
 
+    .nav-box li {
+        color: inherit;
+        margin-bottom: 0.5rem;
+    }
+
     /* Section headers */
     .section-header {
         font-size: 2rem;
         font-weight: 600;
+        color: inherit;
         margin-top: 3rem;
         margin-bottom: 1.5rem;
-        /* Use current text color with transparency for border */
         border-bottom: 3px solid rgba(128, 128, 128, 0.2);
         padding-bottom: 0.75rem;
         letter-spacing: -0.01em;
@@ -106,7 +112,8 @@ st.markdown("""
     .team-category {
         font-size: 1.4rem;
         font-weight: 700;
-        color: #4da6ff; /* A brighter blue that works on dark mode too */
+        /* Brighter blue that is legible on both dark and light backgrounds */
+        color: #60a5fa; 
         margin-top: 2rem;
         margin-bottom: 1.2rem;
         letter-spacing: -0.01em;
@@ -119,10 +126,12 @@ st.markdown("""
     .profile-name {
         font-weight: 500;
         font-size: 1.05rem;
+        color: inherit;
         margin-bottom: 0.2rem;
     }
 
     .profile-role {
+        color: inherit;
         opacity: 0.7;
         font-size: 0.9rem;
         font-style: italic;
@@ -130,40 +139,64 @@ st.markdown("""
 
     /* Key metrics styling */
     .metric-box {
-        background: rgba(128, 128, 128, 0.05);
+        background-color: rgba(128, 128, 128, 0.1);
         border-radius: 8px;
         padding: 1.25rem;
         text-align: center;
-        border: 1px solid rgba(128, 128, 128, 0.1);
+        border: 1px solid rgba(128, 128, 128, 0.2);
     }
 
     .metric-value {
         font-size: 2rem;
         font-weight: 700;
-        color: #4da6ff; /* Brighter blue */
+        color: #60a5fa; /* Bright blue */
         margin-bottom: 0.25rem;
     }
 
     .metric-label {
         font-size: 0.9rem;
+        color: inherit;
         opacity: 0.8;
         font-weight: 500;
         text-transform: uppercase;
         letter-spacing: 0.05em;
     }
 
-    /* Info box - Needs specific colors to work on dark mode */
+    /* Tab content styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        color: inherit;
+        opacity: 0.7;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        opacity: 1;
+    }
+
+    /* Info box */
     .info-box {
-        background-color: rgba(37, 99, 235, 0.1); /* Transparent blue */
-        border-left: 4px solid #2563eb;
+        /* Semi-transparent blue background */
+        background-color: rgba(59, 130, 246, 0.1); 
+        border-left: 4px solid #3b82f6;
         padding: 1rem 1.25rem;
         border-radius: 6px;
         margin: 1.5rem 0;
     }
 
-    /* Heading colors override removal to respect theme */
-    h1, h2, h3, h4, h5, h6, p, span, div {
-        color: inherit !important;
+    .info-box p {
+        color: inherit;
+        margin: 0;
+        line-height: 1.6;
+    }
+
+    /* General Text overrides to ensure nothing is hidden */
+    p, span, div, h1, h2, h3, h4, h5, h6, li {
+        color: inherit;
     }
 
     /* Footer styling */
@@ -172,61 +205,12 @@ st.markdown("""
         padding-top: 2rem;
         border-top: 2px solid rgba(128, 128, 128, 0.2);
         text-align: center;
+        color: inherit;
         opacity: 0.6;
         font-size: 0.9rem;
     }
-    /* --- SIDEBAR STYLING --- */
-
-    /* 1. Sidebar Background & Width (Optional tweak) */
-    [data-testid="stSidebar"] {
-        background-color: #f8fafc; /* Light grey/blue tint */
-        border-right: 1px solid #e2e8f0;
-    }
-
-    /* 2. Navigation Section Padding */
-    [data-testid="stSidebarNav"] {
-        padding-top: 1rem;
-    }
-
-    /* 3. Make Links look like Buttons */
-    [data-testid="stSidebarNav"] a {
-        background-color: transparent;
-        border-radius: 8px;
-        margin-bottom: 8px; /* Spacing between items */
-        padding: 12px 15px; /* Larger clickable area */
-        transition: all 0.2s ease-in-out;
-        border: 1px solid transparent;
-    }
-
-    /* 4. Hover Effect */
-    [data-testid="stSidebarNav"] a:hover {
-        background-color: #eef2ff; /* Light blue hover */
-        border: 1px solid #cbd5e1;
-        transform: translateX(5px); /* Slight movement effect */
-    }
-
-    /* 5. Active Page Highlighting */
-    /* Note: Streamlit handles active state internally, but we can boost the text size */
-    [data-testid="stSidebarNav"] [aria-current="page"] {
-        background-color: #dbeafe; /* Blue highlight for active page */
-        border: 1px solid #3b82f6;
-        font-weight: 700;
-    }
-
-    /* 6. Increase Text Size & Weight */
-    [data-testid="stSidebarNav"] span {
-        font-size: 1.1rem !important; /* Larger text */
-        font-weight: 500;
-        color: #334155;
-    }
-
-    /* 7. Clean up the top spacing if you have a logo */
-    section[data-testid="stSidebar"] > div:first-child {
-        padding-top: 2rem;
-    }
     </style>
 """, unsafe_allow_html=True)
-
 # ============================================================================
 # HEADER SECTION
 # ============================================================================
