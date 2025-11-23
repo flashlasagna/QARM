@@ -642,12 +642,15 @@ with sens_tab1:
                     "max_weight": [0.75, 0.20, 0.05, 0.50],
                 }).set_index("asset")
 
-                # Default params (using session state shocks would be better, but defaulting for safety)
-                params = {
-                    "interest_down": 0.009, "interest_up": 0.011, "spread": 0.103,
-                    "equity_type1": solv["equity_1_param"], "equity_type2": solv["equity_2_param"],
-                    "property": solv["prop_params"], "rho": solv["rho"],
-                }
+                if "params" in st.session_state:
+                    params = st.session_state["params"]
+                else:
+                    # Fallback if missing (e.g., old session)
+                    params = {
+                        "interest_down": 0.009, "interest_up": 0.011, "spread": 0.103,
+                        "equity_type1": 0.39, "equity_type2": 0.49,
+                        "property": 0.25, "rho": 0.75,
+                    }
 
                 sens_opt_df = solve_frontier_combined(
                     initial_asset=sens_asset, liab_value=liab_value, liab_duration=liab_duration,
