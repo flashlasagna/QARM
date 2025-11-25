@@ -523,9 +523,6 @@ if False:
         scr_sprd_val
     ])
 
-# BUG
-st.markdown(opt_df)
-
 market_SCR_opt = opt_df.loc[best_idx, "SCR_breakdown"]
 
 scr_vec = np.array(market_SCR_opt.iloc[:4, ]['SCR'])
