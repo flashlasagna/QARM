@@ -293,7 +293,7 @@ with st.expander("⚙️ Advanced Settings", expanded=not use_auto_params):
             st.info("Using standard Solvency II shocks (39%, 49%, 25%)")
 
     with col_b:
-        st.markdown("**Expected Returns (annual)**")
+        st.markdown("**Risk-Free/Floors Fallback**")
         # --- NEW INPUT HERE ---
         # 1. Risk Free Rate (Base)
         risk_free_rate = st.number_input(
@@ -301,6 +301,7 @@ with st.expander("⚙️ Advanced Settings", expanded=not use_auto_params):
             min_value=0.0, max_value=0.15, value=0.030, step=0.001, format="%.3f",
             help="Used as the baseline for floors and proxies."
         )
+        st.info("ℹ️ This rate is used as a fallback if the automated ECB interpolation fails.")
 
         # 2. Credit Spread (for Corp Bonds proxy)
         credit_spread = st.number_input(
@@ -381,26 +382,19 @@ if st.button("🚀 Optimize Portfolio", disabled=not can_optimize, type="primary
                         ann_ret = (1 + tot_ret) ** (1 / yrs) - 1
                         auto_returns[asset] = float(ann_ret)
 
-                # Assign computed returns with fallbacks
-                r_gov = auto_returns.get('gov_bond', 0.029)
-                r_corp = auto_returns.get('corp_bond', 0.041)
-                r_eq1 = auto_returns.get('equity_1', 0.064)
-                r_eq2 = auto_returns.get('equity_2', 0.064)
-                r_prop = auto_returns.get('property', 0.056)
-                r_tb = auto_returns.get('t_bills', 0.006)
 
+                # --- FETCH LIVE ECB RATES ---
                 try:
                     live_rfr = get_interpolated_ecb_yield(10.0, verbose=False)
                     st.success(f"✓ Fetched live ECB Risk Free Rate (10Y): {live_rfr:.2%}")
                 except:
                     live_rfr = risk_free_rate  # Fallback to user input
-                    st.warning("⚠️ Could not reach ECB API. Using manual assumption.")
+                    st.warning(f"⚠️ ECB interpolation failed. Using manual fallback: {live_rfr:.2%}")
 
                     # 2. Calculate Returns using this live rate
                     # Gov Bonds: Use exact duration from input (dur_gov)
                 try:
-                    r_gov_live = get_interpolated_ecb_yield(dur_gov, verbose=False)
-                    r_gov = r_gov_live
+                    r_gov = get_interpolated_ecb_yield(dur_gov, verbose=False)
                 except:
                     r_gov = live_rfr  # Fallback
 
@@ -412,36 +406,31 @@ if st.button("🚀 Optimize Portfolio", disabled=not can_optimize, type="primary
 
 
                 # Corp Bonds: Risk Free Rate + Credit Spread (approx 1.5%)
-                if auto_returns.get('corp_bond', -1) < 0:
-                    r_corp = live_rfr + 0.015
-                    st.warning(
-                        f"⚠️ Historical Corp Bond return was negative. Using Proxy (Rate + 1.5% = {r_corp:.1%}).")
+                hist_corp = auto_returns.get('corp_bond', -1)
+                if hist_corp < 0:
+                    r_corp = live_rfr + credit_spread # <--- FIX: Uses User Input now
+                    st.warning(f"⚠️ Historical Corp Bond return was negative. Using Proxy (RFR {live_rfr:.1%} + Spread {credit_spread:.1%} = {r_corp:.1%}).")
                 else:
-                    r_corp = auto_returns['corp_bond']
-
+                    r_corp = hist_corp
                 # Equities: Floor at Risk Free Rate + Min Premium (e.g., 2%)
-                min_equity_return = risk_free_rate + 0.02
+                min_equity_threshold = live_rfr + equity_risk_premium
 
                 val_eq1 = auto_returns.get('equity_1', -1)
-                if val_eq1 < min_equity_return:
-                    r_eq1 = min_equity_return
+                if val_eq1 < min_equity_threshold:
+                    r_eq1 = min_equity_threshold
                     st.warning(
                         f"⚠️ Hist. Equity 1 return ({val_eq1:.1%}) < RFR. Using long-term assumption ({r_eq1:.1%}).")
                 else:
                     r_eq1 = val_eq1
 
                 val_eq2 = auto_returns.get('equity_2', -1)
-                if val_eq2 < min_equity_return:
-                    r_eq2 = min_equity_return
+                if val_eq2 < min_equity_threshold:
+                    r_eq2 = min_equity_threshold
                     st.warning(
                         f"⚠️ Hist. Equity 2 return ({val_eq2:.1%}) < RFR. Using long-term assumption ({r_eq2:.1%}).")
                 else:
                     r_eq2 = val_eq2
 
-                try:
-                    r_tb = get_interpolated_ecb_yield(dur_tb, verbose=False)
-                except:
-                    r_tb = live_rfr  # Fallback to the 10Y rate or user input if short rate fails
 
                 st.success(
                     f"✓ Returns: Gov={r_gov:.1%}, Corp={r_corp:.1%}, Eq1={r_eq1:.1%}, Eq2={r_eq2:.1%}, Prop={r_prop:.1%}, TB={r_tb:.1%}")
