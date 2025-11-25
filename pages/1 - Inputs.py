@@ -143,10 +143,10 @@ col1, col2 = st.columns([1.5, 1])
 
 with col1:
     st.subheader("Portfolio Allocation")
-    total_A = st.number_input("Total Assets (€ millions)", min_value=0.0, value=2000.0, step=10.0)
+    total_A = st.number_input("Total Assets (€ millions)", min_value=0.0, value=2200.0, step=10.0)
 
     st.markdown("**Asset Allocation (€ millions)**")
-    A_gov = st.number_input("Government Bonds", min_value=0.0, value=1200.0, step=1.0)
+    A_gov = st.number_input("Government Bonds", min_value=0.0, value=1400.0, step=1.0)
     A_corp = st.number_input("Corporate Bonds", min_value=0.0, value=600.0, step=1.0)
     A_eq1 = st.number_input("Equity Type 1 (Developed Markets)", min_value=0.0, value=50.0, step=1.0)
     A_eq2 = st.number_input("Equity Type 2 (Emerging Markets)", min_value=0.0, value=0.0, step=1.0)

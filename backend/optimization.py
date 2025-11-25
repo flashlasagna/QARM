@@ -49,6 +49,7 @@ def objective(x, r, gamma, T, asset_dur, liab_value, liab_duration,
     # Market SCR approximation: sqrt(s^T R s)
     scr_market = np.sqrt(s @ R @ s)
 
+    '''
     # === NEW PENALTY LOGIC ===
     # Calculate Basic Own Funds (Assets - Liabilities)
     # Assets = T (Total wealth is constant during rebalancing weight optimization)
@@ -64,7 +65,9 @@ def objective(x, r, gamma, T, asset_dur, liab_value, liab_duration,
 
     # Objective: Maximize (Return - Risk) - Penalty
     # We return negative because scipy minimizes
-    return -(port_ret - (gamma * scr_market / T)) + penalty
+
+    '''
+    return -(port_ret - (gamma * scr_market / T)) 
 
 
 # =============================
@@ -149,6 +152,34 @@ def define_constraints(T, asset_dur, liab_value, liab_duration, allocation_limit
         ub=allocation_limits["max_weight"].values,
     )
 
+    # === Solvency Constraints === (avoid solution of solvency < 100%)
+
+    def solvency_con(x):
+        """
+        Enforces solvency >= 100%
+        i.e.  SCR_market <= BOF  <=>  BOF - SCR >= 0
+        """
+        w = x[:6]
+        s = x[6:]
+
+        # Compute interest direction → choose correct correlation matrix
+        scr_int_result = scr_interest_rate(
+            w * T, asset_dur, liab_value, liab_duration,
+            int_down_param, int_up_param
+        )
+        direction = scr_int_result.get("direction", "down").lower()
+        R = corr_upward.values if direction == "up" else corr_downward.values
+
+        # Market SCR
+        scr_market = np.sqrt(s @ R @ s)
+
+        # Basic Own Funds (constant during optimisation)
+        BOF = T - liab_value
+
+        # Return BOF - SCR >= 0
+        return BOF - scr_market
+    
+    solvency_constraint = NonlinearConstraint(solvency_con, 0, np.inf)
 
 
     return [
@@ -159,6 +190,7 @@ def define_constraints(T, asset_dur, liab_value, liab_duration, allocation_limit
         spread_constraint,
         budget_constraint,
         alloc_constraint,
+        solvency_constraint
     ]
 
 
@@ -259,6 +291,9 @@ def solve_frontier_combined(initial_asset, liab_value, liab_duration,
             corr_downward,
             corr_upward
         )
+
+        scr_breakdown = scr_market_result['summary_table']
+        
         scr_total = scr_market_result["SCR_market_final"]
 
         # Solvency ratio = BOF / SCR
@@ -273,7 +308,9 @@ def solve_frontier_combined(initial_asset, liab_value, liab_duration,
             "SCR_market": scr_total,
             "solvency": solvency_ratio,
             "objective": -res.fun,
-            "BOF": BOF
+            "BOF": BOF,
+            "SCR_breakdown": scr_breakdown, 
+            "direction": scr_interest["direction"]
         })
 
         # Warm start for next iteration

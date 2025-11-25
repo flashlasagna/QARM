@@ -26,10 +26,17 @@ from backend.helpers import plot_scenario_comparison
 from backend.data_calculator import (
     compute_ir_shocks_from_eiopa,
     compute_spread_shock_eiopa)
+from backend.solvency_calc import (
+    scr_interest_rate, 
+    scr_eq,
+    scr_prop, 
+    scr_sprd, 
+    aggregate_market_scr, 
+    marginal_scr,
+    allocate_marginal_scr
+)
 
-
-
-st.title("📈 Optimization Results")
+st.title("Optimization Results")
 
 # --- 1. Session State Checks ---
 if not st.session_state.get("optimization_run"):
@@ -50,23 +57,94 @@ if "opt_df" in st.session_state:
 
     # FIX: Explicitly define liab_duration here
     liab_duration = st.session_state["liab_duration"]
-    # === INSERT DEBUG HERE ===
-    st.write(f"DEBUG CHECK - Duration: {liab_duration} (Type: {type(liab_duration)})")
-    st.write(f"DEBUG CHECK - Value: {liab_value} (Type: {type(liab_value)})")
+    
     # =========================
 else:
     # Handle missing data gracefully if needed
     st.info("Optimization data not fully loaded.")
     st.stop()
 
-# Find Best Solution
-best_idx = opt_df["objective"].idxmax()
-best = opt_df.loc[best_idx]
+
+
+# Get parameters from config (or session state if stored, otherwise re-load)
+cfg = load_config()
+corr_down, corr_up = get_corr_matrices(cfg)
+solv = get_solvency_params(cfg)
+
+# Recalculate SCR components for the BEST portfolio
+# 1. Interest Rate Risk
+# We need shocks from session state or re-compute
+if st.session_state.get('use_eiopa_curves', True):
+    ir_up, ir_down = compute_ir_shocks_from_eiopa(liab_duration=liab_value,
+                                                  verbose=False)  # Note: passed liab_value as placeholder in previous turn, ideally use liab_duration
+else:
+    # Fallback or pull from somewhere else. For now re-compute or assume safe defaults if missing
+    # Better: Store shocks in session state in Inputs.py
+    ir_up, ir_down = 0.011, 0.009
+
+# Compute Interest SCR
+scr_int_CUR = scr_interest_rate(
+    initial_asset["asset_val"],
+    initial_asset["asset_dur"],
+    liab_value,
+    liab_duration,
+    ir_up,
+    ir_down
+)
+
+# 2. Equity Risk
+A_eq1_CUR = initial_asset["asset_val"][2]
+A_eq1_CUR = initial_asset["asset_val"][3]
+scr_eq_CUR = scr_eq(A_eq1_CUR, A_eq1_CUR, solv["equity_1_param"], solv["equity_2_param"], solv["rho"])
+
+# 3. Property Risk
+scr_prop_CUR = scr_prop(initial_asset["asset_val"][4], solv["prop_params"])
+
+# 4. Spread Risk
+# Need spread shock (re-compute or store)
+corp_dur = initial_asset.loc["corp_bond", "asset_dur"]
+spread_shock_val = compute_spread_shock_eiopa(corp_dur, verbose=False)
+scr_sprd_CUR = scr_sprd(initial_asset["asset_val"][1], spread_shock_val)
+
+# 5. Prepare Vector for Marginal Calculation
+scr_vec_CUR = np.array([
+    scr_int_CUR["SCR_interest"],
+    scr_eq_CUR["SCR_eq_total"],
+    scr_prop_CUR,
+    scr_sprd_CUR
+])
+
+# Determine direction (Up/Down) from Interest result
+direction_CUR = scr_int_CUR["direction"]
+
+
+market_scr_CUR = aggregate_market_scr(
+    scr_int_CUR,
+    scr_eq_CUR, 
+    scr_prop_CUR,
+    scr_sprd_CUR,
+    corr_down,
+    corr_up
+)
+
+
+# Run Marginal Calculation (Risk Level)
+marg_risk_CUR = marginal_scr(scr_vec_CUR, direction_CUR, corr_down.values, corr_up.values)
+
 
 # Calculate Current Metrics (ignoring duration)
 current_ret = float((initial_asset["asset_ret"] * initial_asset["asset_weight"]).sum())
-current_SCR = float(best["SCR_market"])  # Approximation using optimal's SCR logic for comparison
+current_SCR = market_scr_CUR['summary_table'].loc['total', 'SCR']
 current_sol = (initial_asset['asset_val'].sum() - liab_value) / current_SCR
+
+
+# Optimal one is the one having solvency closest to current solvency (so we keep safety unchanged)
+best_idx = (opt_df["solvency"] - current_sol).abs().idxmin()
+best_row = opt_df.loc[best_idx]
+
+
+best = opt_df.loc[best_idx]
+
 
 # Best Metrics
 best_ret = float(best["return"])
@@ -92,7 +170,7 @@ if best_sol < 1.0:
     """)
 
 # --- 3. Key Metrics Comparison ---
-st.subheader("📊 Key Metrics Comparison")
+st.subheader("Key Metrics Comparison")
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -113,6 +191,7 @@ with col2:
     )
 
 with col3:
+
     st.metric(
         "SCR Market",
         f"€{best_SCR:.1f}m",
@@ -132,7 +211,7 @@ st.markdown("---")
 
 
 # --- 5. Efficient Frontier Plot (High Fidelity) ---
-st.subheader("📉 Efficient Frontier")
+st.subheader("Efficient Frontier")
 
 # 1. SORTING: Order by Solvency Ratio to ensure the line draws sequentially
 # We sort descending (High Solvency -> Low Solvency) to help the filter logic
@@ -184,7 +263,7 @@ optimal_return = best["return"] * 100
 
 ax_frontier.scatter(
     optimal_solvency, optimal_return, 
-    s=600, c='#FFD700', marker='*',
+    s=100, c='#FFD700', marker='*',
     edgecolors='#FF8C00', linewidth=3, 
     label='Optimal Portfolio', 
     zorder=5
@@ -202,11 +281,63 @@ ax_frontier.annotate(
 # Current Point (Red Diamond)
 ax_frontier.scatter(
     current_sol * 100, current_ret * 100, 
-    s=400, c='#E74C3C', marker='D',
+    s=100, c='#E74C3C', marker='D',
     edgecolors='#C0392B', linewidth=3, 
     label='Current Portfolio', 
     zorder=4, alpha=0.9
 )
+
+# ======== OPTIMAL POINT (Gold Star + Annotation) ========
+ax_frontier.scatter(
+    optimal_solvency, optimal_return, 
+    s=200, c='#FFD700', marker='*',
+    edgecolors='#FF8C00', linewidth=3, 
+    label='Optimal Portfolio', 
+    zorder=5
+)
+
+ax_frontier.annotate(
+    f'OPTIMAL\n{optimal_return:.2f}% | {optimal_solvency:.1f}%',
+    xy=(optimal_solvency, optimal_return),
+    xytext=(25, 25),
+    textcoords='offset points',
+    fontsize=10, fontweight='bold',
+    bbox=dict(
+        boxstyle='round,pad=0.7',
+        facecolor='#FFD700',
+        edgecolor='#FF8C00',
+        alpha=0.9
+    ),
+    arrowprops=dict(arrowstyle='->', color='#FF8C00', lw=2.2),
+    zorder=6
+)
+
+
+# ======== CURRENT POINT (Red Dot + Annotation) ========
+ax_frontier.scatter(
+    current_sol * 100, current_ret * 100,
+    s=60, c='#E74C3C', marker='o',
+    edgecolors='#C0392B', linewidth=1.5,
+    label='Current Portfolio',
+    zorder=4, alpha=0.95
+)
+
+ax_frontier.annotate(
+    f'CURRENT\n{current_ret*100:.2f}% | {current_sol*100:.1f}%',
+    xy=(current_sol * 100, current_ret * 100),
+    xytext=(-50, -35),         # offset down-left so it doesn't overlap
+    textcoords='offset points',
+    fontsize=9, fontweight='bold',
+    bbox=dict(
+        boxstyle='round,pad=0.6',
+        facecolor='#FADBD8',
+        edgecolor='#C0392B',
+        alpha=0.9
+    ),
+    arrowprops=dict(arrowstyle='->', color='#C0392B', lw=2),
+    zorder=6
+)
+
 
 # Styling
 ax_frontier.axvline(x=100, color='#95a5a6', linestyle='--', linewidth=2.5, alpha=0.6, label='100% Solvency')
@@ -227,19 +358,22 @@ w_opt = best["w_opt"]
 
 with col_left:
     st.markdown("**Amounts (€ millions)**")
+
     allocation_df = pd.DataFrame({
         "Asset Class": ["Gov Bonds", "Corp Bonds", "Equity 1", "Equity 2", "Property", "T-Bills"],
+        "Return (%)": (initial_asset["asset_ret"] * 100),
         "Current (€m)": initial_asset["asset_val"].values,
         "Optimal (€m)": A_opt,
         "Change (€m)": A_opt - initial_asset["asset_val"].values
     })
 
-    # FIX: Apply formatting only to specific numeric columns using a dictionary
+    # FIX: Add Return (%) to style.format
     st.dataframe(
         allocation_df.style.format({
+            "Return (%)": "{:.2f}",
             "Current (€m)": "{:.1f}",
             "Optimal (€m)": "{:.1f}",
-            "Change (€m)": "{:+.1f}"  # Adds a +/- sign for changes
+            "Change (€m)": "{:+.1f}"
         }),
         use_container_width=True,
         hide_index=True
@@ -334,8 +468,7 @@ st.markdown("---")
 # =========================================================
 # 🧩 MARGINAL SCR ANALYSIS (NEW SECTION)
 # =========================================================
-st.subheader("🧩 Marginal SCR Contribution")
-st.markdown("Breakdown of how each asset class contributes to the total Market SCR.")
+st.subheader("Market Solvency Capital Requirement (SCR)")
 
 # --- 1. Calculate Marginal SCR (Logic adapted from notebook) ---
 # We need to reconstruct the SCR components for the OPTIMAL portfolio
@@ -343,58 +476,61 @@ st.markdown("Breakdown of how each asset class contributes to the total Market S
 
 # Re-calculate component SCRs for the optimal allocation
 # Note: This logic repeats some backend work but is necessary if 'best' doesn't store raw components
-from backend.solvency_calc import scr_interest_rate, scr_eq, scr_prop, scr_sprd, marginal_scr, allocate_marginal_scr
 
-# Get parameters from config (or session state if stored, otherwise re-load)
-cfg = load_config()
-corr_down, corr_up = get_corr_matrices(cfg)
-solv = get_solvency_params(cfg)
 
-# Recalculate SCR components for the BEST portfolio
-# 1. Interest Rate Risk
-# We need shocks from session state or re-compute
-if st.session_state.get('use_eiopa_curves', True):
-    ir_up, ir_down = compute_ir_shocks_from_eiopa(liab_duration=liab_value,
-                                                  verbose=False)  # Note: passed liab_value as placeholder in previous turn, ideally use liab_duration
-else:
-    # Fallback or pull from somewhere else. For now re-compute or assume safe defaults if missing
-    # Better: Store shocks in session state in Inputs.py
-    ir_up, ir_down = 0.011, 0.009
+if False: 
 
-# Compute Interest SCR
-scr_int_res = scr_interest_rate(
-    best["A_opt"],
-    initial_asset["asset_dur"],
-    liab_value,
-    liab_duration,
-    ir_up,
-    ir_down
-)
 
-# 2. Equity Risk
-A_eq1_opt = best["A_opt"][2]
-A_eq2_opt = best["A_opt"][3]
-scr_eq_res = scr_eq(A_eq1_opt, A_eq2_opt, solv["equity_1_param"], solv["equity_2_param"], solv["rho"])
+    # Compute Interest SCR
+    scr_int_res = scr_interest_rate(
+        best["A_opt"],
+        initial_asset["asset_dur"],
+        liab_value,
+        liab_duration,
+        ir_up,
+        ir_down
+    )
 
-# 3. Property Risk
-scr_prop_val = scr_prop(best["A_opt"][4], solv["prop_params"])
+    # 2. Equity Risk
+    A_eq1_opt = best["A_opt"][2]
+    A_eq2_opt = best["A_opt"][3]
+    scr_eq_res = scr_eq(A_eq1_opt, A_eq2_opt, solv["equity_1_param"], solv["equity_2_param"], solv["rho"])
 
-# 4. Spread Risk
-# Need spread shock (re-compute or store)
-corp_dur = initial_asset.loc["corp_bond", "asset_dur"]
-spread_shock_val = compute_spread_shock_eiopa(corp_dur, verbose=False)
-scr_sprd_val = scr_sprd(best["A_opt"][1], spread_shock_val)
+    # 3. Property Risk
+    scr_prop_val = scr_prop(best["A_opt"][4], solv["prop_params"])
 
-# 5. Prepare Vector for Marginal Calculation
-scr_vec = np.array([
-    scr_int_res["SCR_interest"],
-    scr_eq_res["SCR_eq_total"],
-    scr_prop_val,
-    scr_sprd_val
-])
+    # 4. Spread Risk
+    # Need spread shock (re-compute or store)
+    corp_dur = initial_asset.loc["corp_bond", "asset_dur"]
+    spread_shock_val = compute_spread_shock_eiopa(corp_dur, verbose=False)
+    scr_sprd_val = scr_sprd(best["A_opt"][1], spread_shock_val)
 
-# Determine direction (Up/Down) from Interest result
-direction = scr_int_res["direction"]
+
+    market_SCR_opt = aggregate_market_scr(
+        scr_int_res,
+        scr_eq_res, 
+        scr_prop_val,
+        scr_sprd_val,
+        corr_down,
+        corr_up
+    )
+
+    # 5. Prepare Vector for Marginal Calculation
+    scr_vec = np.array([
+        scr_int_res["SCR_interest"],
+        scr_eq_res["SCR_eq_total"],
+        scr_prop_val,
+        scr_sprd_val
+    ])
+
+
+market_SCR_opt = opt_df.loc[best_idx, "SCR_breakdown"]
+
+scr_vec = np.array(market_SCR_opt.iloc[:4, ]['SCR'])
+
+
+# Get it from the optimizer
+direction = opt_df.loc[best_idx, 'direction']
 
 # Run Marginal Calculation (Risk Level)
 marg_risk_df = marginal_scr(scr_vec, direction, corr_down.values, corr_up.values)
@@ -421,11 +557,45 @@ opt_asset_df["asset_val"] = best["A_opt"]
 
 mscr_assets = allocate_marginal_scr(marg_risk_df, direction, opt_asset_df, alloc_params)
 
+
+
+
 # --- 2. Display Results ---
 
-col_m1, col_m2 = st.columns([1, 1])
+col_m1, col_m2 = st.columns([2, 1])
 
 with col_m1:
+
+    st.markdown("**SCR per risk type**")
+    scr_display = pd.concat([market_scr_CUR['summary_table'], market_SCR_opt], axis=1)
+    scr_display.columns=['Current', 'Optimal']
+    new_order = ["interest", "equity", "property", "spread", "diversification", "total"]
+    scr_display = scr_display.reindex(new_order)
+
+    scr_display = scr_display.rename(
+    columns={"Current": "Current (€m)", "Optimal": "Optimal (€m)"},
+    index={
+        "interest": "Interest",
+        "equity": "Equity",
+        "property": "Property",
+        "spread": "Spread",
+        "diversification": "Diversified",
+        "total": "Total"
+    }
+    )
+
+    scr_display = scr_display.reset_index()
+
+    st.dataframe(
+        scr_display.style.format({
+            "Current (€m)": "{:.1f}",
+            "Optimal (€m)": "{:.1f}"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )    
+
+
     st.markdown("**Asset Class Contribution Table**")
     # Clean up table for display
     disp_df = mscr_assets[["asset", "mSCR"]].copy()
