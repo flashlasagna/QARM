@@ -142,7 +142,7 @@ st.markdown("---")
 col1, col2 = st.columns([1.5, 1])
 
 with col1:
-    st.subheader("📊 Portfolio Allocation")
+    st.subheader("Portfolio Allocation")
     total_A = st.number_input("Total Assets (€ millions)", min_value=0.0, value=2000.0, step=10.0)
 
     st.markdown("**Asset Allocation (€ millions)**")
@@ -162,7 +162,7 @@ with col1:
         st.warning(f"⚠ Total allocated: €{total_allocated:.1f}m (Target: €{total_A:.1f}m)")
 
 with col2:
-    st.subheader("📋 Liabilities & Durations")
+    st.subheader("Liabilities & Durations")
     BE_value = st.number_input("Best Estimate Liabilities (€m)", min_value=0.0, value=1800.0, step=10.0)
     BE_dur = st.number_input("Liabilities Duration (years)", min_value=0.0, value=14.0, step=0.1)
 
@@ -178,72 +178,86 @@ with col2:
 st.markdown("---")
 
 
+# Auto-calculate toggle (BEFORE columns)
+use_auto_params = st.checkbox(
+    "🤖 Auto-calculate Parameters from Market Data",
+    value=True,  # ✅ Default to TRUE now
+    help="Automatically compute expected returns, durations, and shocks from selected ETF tickers"
+)
+
+if use_auto_params:
+    st.success(
+        "✨ **Automated Mode**: Select your ETF tickers below, and all parameters will be computed automatically!")
+else:
+    st.info("📝 **Manual Mode**: You'll need to enter all parameters manually in Advanced Settings.")
+
+st.markdown("---")
 
 # ==========================================
 # TICKER SELECTION (ALWAYS VISIBLE)
 # ==========================================
 
+if use_auto_params:
 
-st.subheader("Select Your ETF Tickers")
-st.markdown("Choose the ETFs/tickers that represent each asset class in your portfolio.")
+    st.subheader("Select Your ETF Tickers")
+    st.markdown("Choose the ETFs/tickers that represent each asset class in your portfolio.")
 
-ticker_col1, ticker_col2, ticker_col3 = st.columns(3)
+    ticker_col1, ticker_col2, ticker_col3 = st.columns(3)
 
-with ticker_col1:
-    st.markdown("**Fixed Income**")
-    ticker_gov = st.text_input("Government Bonds", value=st.session_state.get('ticker_gov', "IBGM.L"),
-                               help="e.g., IBGM.L")
-    ticker_corp = st.text_input("Corporate Bonds", value=st.session_state.get('ticker_corp', "IE15.L"),
-                                help="e.g., IE15.L")
-    ticker_tbills = st.text_input("Treasury Bills / Cash", value=st.session_state.get('ticker_tbills', "CSH2.L"))
+    with ticker_col1:
+        st.markdown("**Fixed Income**")
+        ticker_gov = st.text_input("Government Bonds", value=st.session_state.get('ticker_gov', "IBGM.L"),
+                                help="e.g., IBGM.L")
+        ticker_corp = st.text_input("Corporate Bonds", value=st.session_state.get('ticker_corp', "IE15.L"),
+                                    help="e.g., IE15.L")
+        ticker_tbills = st.text_input("Treasury Bills / Cash", value=st.session_state.get('ticker_tbills', "CSH2.L"))
+    with ticker_col2:
+        st.markdown("**Equity**")
+        ticker_eq1 = st.text_input("Equity Type 1 (Developed)", value=st.session_state.get('ticker_eq1', "EUNL.DE"))
+        ticker_eq2 = st.text_input("Equity Type 2 (Emerging)", value=st.session_state.get('ticker_eq2', "IQQE.DE"))
 
-with ticker_col2:
-    st.markdown("**Equity**")
-    ticker_eq1 = st.text_input("Equity Type 1 (Developed)", value=st.session_state.get('ticker_eq1', "EUNL.DE"))
-    ticker_eq2 = st.text_input("Equity Type 2 (Emerging)", value=st.session_state.get('ticker_eq2', "IQQE.DE"))
+    with ticker_col3:
+        st.markdown("**Real Assets**")
+        ticker_prop = st.text_input("Property / Real Estate", value=st.session_state.get('ticker_prop', "EUNK.DE"))
+        st.markdown("**Data Period**")
+        lookback_years = st.slider("Historical data (years)", 1, 10, st.session_state.get('lookback_years', 5))
 
-with ticker_col3:
-    st.markdown("**Real Assets**")
-    ticker_prop = st.text_input("Property / Real Estate", value=st.session_state.get('ticker_prop', "EUNK.DE"))
-    st.markdown("**Data Period**")
-    lookback_years = st.slider("Historical data (years)", 1, 10, st.session_state.get('lookback_years', 5))
+    # Save tickers to session state
+    st.session_state.update({
+        'ticker_gov': ticker_gov, 'ticker_corp': ticker_corp, 'ticker_tbills': ticker_tbills,
+        'ticker_eq1': ticker_eq1, 'ticker_eq2': ticker_eq2, 'ticker_prop': ticker_prop,
+        'lookback_years': lookback_years
+    })
 
-# Save tickers to session state
-st.session_state.update({
-    'ticker_gov': ticker_gov, 'ticker_corp': ticker_corp, 'ticker_tbills': ticker_tbills,
-    'ticker_eq1': ticker_eq1, 'ticker_eq2': ticker_eq2, 'ticker_prop': ticker_prop,
-    'lookback_years': lookback_years
-})
+    if st.button("🔍 Validate Tickers", type="secondary"):
+        with st.spinner("Validating tickers and fetching data..."):
+            all_tickers = {
+                "Government Bonds": ticker_gov, "Corporate Bonds": ticker_corp, "Treasury Bills": ticker_tbills,
+                "Equity Type 1": ticker_eq1, "Equity Type 2": ticker_eq2, "Property": ticker_prop
+            }
+            validation_results = []
+            for asset_class, ticker in all_tickers.items():
+                if not ticker.strip():
+                    continue
 
-if st.button("🔍 Validate Tickers", type="secondary"):
-    with st.spinner("Validating tickers and fetching data..."):
-        all_tickers = {
-            "Government Bonds": ticker_gov, "Corporate Bonds": ticker_corp, "Treasury Bills": ticker_tbills,
-            "Equity Type 1": ticker_eq1, "Equity Type 2": ticker_eq2, "Property": ticker_prop
-        }
-        validation_results = []
-        for asset_class, ticker in all_tickers.items():
-            if not ticker.strip():
-                continue
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=lookback_years * 365 + 100)
+                prices = fetch_ticker_prices(ticker, start_date, end_date)
 
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=lookback_years * 365 + 100)
-            prices = fetch_ticker_prices(ticker, start_date, end_date)
+                if prices is None or len(prices) < 100:
+                    status = "❌ Insufficient data"
+                else:
+                    total_return = (prices.iloc[-1] / prices.iloc[0]) - 1
+                    years = len(prices) / 252
+                    ann_return = (1 + total_return) ** (1 / years) - 1
+                    status = f"✅ Valid ({ann_return:.2%})"
 
-            if prices is None or len(prices) < 100:
-                status = "❌ Insufficient data"
-            else:
-                total_return = (prices.iloc[-1] / prices.iloc[0]) - 1
-                years = len(prices) / 252
-                ann_return = (1 + total_return) ** (1 / years) - 1
-                status = f"✅ Valid ({ann_return:.2%})"
+                validation_results.append({
+                    "Asset Class": asset_class, "Ticker": ticker, "Status": status,
+                    "Data Points": len(prices) if prices is not None else 0
+                })
 
-            validation_results.append({
-                "Asset Class": asset_class, "Ticker": ticker, "Status": status,
-                "Data Points": len(prices) if prices is not None else 0
-            })
-
-        st.dataframe(pd.DataFrame(validation_results), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(validation_results), use_container_width=True, hide_index=True)
 
 st.markdown("---")
 
