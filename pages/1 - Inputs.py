@@ -229,7 +229,7 @@ with col1:
     A_gov = st.number_input("Government Bonds", min_value=0.0, value=1200.0, step=1.0)
     A_corp = st.number_input("Corporate Bonds", min_value=0.0, value=600.0, step=1.0)
     A_eq1 = st.number_input("Equity Type 1 (Developed Markets)", min_value=0.0, value=50.0, step=1.0)
-    A_eq2 = st.number_input("Equity Type 2 (Emerging Markets)", min_value=0.0, value=0, step=1.0)
+    A_eq2 = st.number_input("Equity Type 2 (Emerging Markets)", min_value=0.0, value=0.0, step=1.0)
     A_prop = st.number_input("Property", min_value=0.0, value=50.0, step=1.0)
     A_tb = st.number_input("Treasury Bills", min_value=0.0, value=100.0 step=1.0)
 
