@@ -800,334 +800,6 @@ if False:
 
 st.markdown("---")
 
-# =========================================================
-# 💾 EXPORT SECTION (With Sensitivity Scenarios & Specific Frontiers)
-# =========================================================
-st.subheader("💾 Export Results")
-col_export1, col_export2 = st.columns(2)
-
-# --- Define Scenarios ---
-scenarios_to_run = {
-    "Optimistic": {"type": "return", "val": 0.005},
-    "Pessimistic": {"type": "return", "val": -0.005},
-    "Higher Equity": {"type": "return_special", "asset": [2, 3], "val": 0.02},
-    "Lower Bond": {"type": "return_special", "asset": [0, 1], "val": -0.01},
-    "Stressed Shocks": {"type": "shock", "mult": 1.5},
-    "Relaxed Shocks": {"type": "shock", "mult": 0.7},
-    "High Eq Shock": {"type": "shock_special", "key": ["eq1", "eq2"], "val": 0.15},
-    "Low IR Shock": {"type": "shock_special", "key": ["ir_up", "ir_down"], "mult": 0.8}
-}
-
-
-# --- Helper: Run Optimization for a Scenario ---
-def run_scenario_optimization(name, config):
-    # Safety checks for session state variables
-    if "params" not in st.session_state:
-        return None, None
-
-    sim_params = st.session_state["params"].copy()
-    sim_asset = initial_asset.copy()
-
-    # 2. Apply Modifications
-    if config.get("type") == "return":
-        sim_asset["asset_ret"] = sim_asset["asset_ret"] + config["val"]
-
-    elif config.get("type") == "return_special":
-        new_rets = sim_asset["asset_ret"].values.copy()
-        for idx in config["asset"]:
-            new_rets[idx] += config["val"]
-        sim_asset["asset_ret"] = new_rets
-
-    elif config.get("type") == "shock":
-        for k in ["interest_up", "interest_down", "spread", "property", "equity_type1", "equity_type2"]:
-            sim_params[k] *= config["mult"]
-
-    elif config.get("type") == "shock_special":
-        if "val" in config:
-            for k in ["equity_type1", "equity_type2"]:
-                sim_params[k] = min(1.0, sim_params[k] + config["val"])
-        elif "mult" in config:
-            for k in ["interest_up", "interest_down"]:
-                sim_params[k] *= config["mult"]
-
-    # 3. Run Optimization
-    alloc_lims = pd.DataFrame({
-        "asset": ["gov_bond", "illiquid_assets", "t_bills", "corp_bond"],
-        "min_weight": [0.25, 0.0, 0.01, 0.0],
-        "max_weight": [0.90, 0.20, 0.10, 0.50],
-    }).set_index("asset")
-
-    # Pass DataFrames directly
-    df_res = solve_frontier_combined(
-        sim_asset, liab_value, liab_duration,
-        corr_down, corr_up, alloc_lims, sim_params
-    )
-
-    if df_res.empty: return None, None
-
-    # 4. Pick Best
-    best_sim = df_res.loc[df_res["objective"].idxmax()]
-
-    # Return BOTH the best result AND the full dataframe (frontier)
-    return best_sim, df_res
-
-
-# --- Excel Generation Function ---
-def generate_comprehensive_report():
-    # Safely retrieve globally defined data
-    g = globals()
-
-    # --- Start Workbook ---
-    wb = Workbook()
-    default_ws = wb.active
-    wb.remove(default_ws)
-
-    # ==========================
-    # SHEET 1: EXECUTIVE SUMMARY
-    # ==========================
-    ws_main = wb.create_sheet("Executive Summary")
-    ws_main.sheet_view.showGridLines = False
-
-    ws_main["A1"] = "SOLVENCY II STRATEGIC REPORT"
-    ws_main["A1"].font = Font(size=18, bold=True, color="2C3E50")
-    ws_main["A2"] = f"Generated: {datetime.now().strftime('%d %b %Y, %H:%M')}"
-
-    # Base Case Metrics
-    ws_main["A4"] = "BASE CASE OVERVIEW"
-    ws_main["A4"].font = Font(bold=True, size=12)
-
-    headers = ["Metric", "Current", "Optimal"]
-    ws_main.append([])
-    ws_main.append(headers)
-
-    metrics = [
-        ("Expected Return", g['current_ret'], g['best_ret'], "0.00%"),
-        ("Solvency Ratio", g['current_sol'], g['best_sol'], "0.0%"),
-        ("SCR Market (€m)", g['current_SCR'], g['best_SCR'], "#,##0.0"),
-        ("Basic Own Funds (€m)", g['best_BOF'], g['best_BOF'], "#,##0.0")
-    ]
-
-    start_row = 6
-    for i, (name, cur, opt, fmt) in enumerate(metrics):
-        ws_main.cell(row=start_row + i, column=1, value=name)
-        c2 = ws_main.cell(row=start_row + i, column=2, value=cur);
-        c2.number_format = fmt
-        c3 = ws_main.cell(row=start_row + i, column=3, value=opt);
-        c3.number_format = fmt
-
-    # --- ALLOCATION DATA & CHARTS (Current vs Optimal) ---
-    ws_data = wb.create_sheet("Base_Data")
-    ws_data.append(["Asset", "Current Weight", "Optimal Weight"])
-    for i, asset in enumerate(["Gov", "Corp", "Eq1", "Eq2", "Prop", "TB"]):
-        ws_data.append([asset, g['initial_asset']["asset_weight"].values[i], g['best']["w_opt"][i]])
-
-    # 1. Optimal Allocation Pie
-    chart_opt = PieChart()
-    chart_opt.title = "Optimal Allocation"
-    data_opt = Reference(ws_data, min_col=3, min_row=1, max_row=7)
-    cats = Reference(ws_data, min_col=1, min_row=2, max_row=7)
-    chart_opt.add_data(data_opt, titles_from_data=True)
-    chart_opt.set_categories(cats)
-    ws_main.add_chart(chart_opt, "E4")
-
-    # 2. Current Allocation Pie (New Request)
-    chart_cur = PieChart()
-    chart_cur.title = "Current Allocation"
-    data_cur = Reference(ws_data, min_col=2, min_row=1, max_row=7)
-    chart_cur.add_data(data_cur, titles_from_data=True)
-    chart_cur.set_categories(cats)
-    ws_main.add_chart(chart_cur, "M4")  # Place to the right
-
-    # ==========================
-    # SHEET 2: mSCR ANALYSIS (New Request)
-    # ==========================
-    if 'disp_df' in g and not g['disp_df'].empty:
-        ws_mscr = wb.create_sheet("mSCR Analysis")
-        ws_mscr["A1"] = "Marginal SCR Contribution (Optimal Portfolio)"
-        ws_mscr["A1"].font = Font(size=14, bold=True)
-        ws_mscr.append([])
-
-        # Write Table
-        for r in dataframe_to_rows(g['disp_df'], index=False, header=True):
-            ws_mscr.append(r)
-
-        # Add Pie Chart for mSCR
-        chart_pie = PieChart()
-        chart_pie.title = "Risk Contribution (mSCR)"
-
-        # Data ranges (assuming table starts at A3)
-        labels = Reference(ws_mscr, min_col=1, min_row=4, max_row=4 + len(g['disp_df']))
-        data = Reference(ws_mscr, min_col=2, min_row=3, max_row=4 + len(g['disp_df']))  # Col 2 is mSCR
-
-        chart_pie.add_data(data, titles_from_data=True)
-        chart_pie.set_categories(labels)
-        ws_mscr.add_chart(chart_pie, "E3")
-
-    # ==========================
-    # SCENARIO SHEETS (Loop)
-    # ==========================
-    prog_bar = st.progress(0)
-    status_text = st.empty()
-    total_scenarios = len(scenarios_to_run)
-
-    for i, (scen_name, config) in enumerate(scenarios_to_run.items()):
-        status_text.text(f"Running scenario {i + 1}/{total_scenarios}: {scen_name}...")
-        prog_bar.progress((i) / total_scenarios)
-
-        # Run Optimization -> Get Best AND Full Frontier
-        res, frontier_df = run_scenario_optimization(scen_name, config)
-        if res is None: continue
-
-        ws = wb.create_sheet(f"Sens - {scen_name}")
-        ws["A1"] = f"SCENARIO: {scen_name.upper()}"
-        ws["A1"].font = Font(size=14, bold=True, color="E74C3C")
-        ws["A2"] = f"Type: {config['type']}"
-
-        # --- Metrics Table ---
-        ws.append([])
-        ws.append(["Metric", "Base Optimal", "Scenario Optimal", "Delta"])
-        ws["A4"].font = Font(bold=True)
-
-        scen_ret, scen_sol, scen_scr = res["return"], res["solvency"], res["SCR_market"]
-
-        data_rows = [
-            ("Return", g['best_ret'], scen_ret, "0.00%"),
-            ("Solvency", g['best_sol'], scen_sol, "0.0%"),
-            ("SCR (€m)", g['best_SCR'], scen_scr, "#,##0.0")
-        ]
-
-        for r_idx, (m, b, s, fmt) in enumerate(data_rows, 5):
-            ws.cell(row=r_idx, column=1, value=m)
-            ws.cell(row=r_idx, column=2, value=b).number_format = fmt
-            c_s = ws.cell(row=r_idx, column=3, value=s);
-            c_s.number_format = fmt
-            c_d = ws.cell(row=r_idx, column=4, value=s - b);
-            c_d.number_format = fmt
-
-            if m == "Return" and s < b: c_d.font = Font(color="FF0000")
-            if m == "Solvency" and s < 1.0: c_s.font = Font(color="FF0000", bold=True)
-
-        # --- Allocation Table & Pie Chart ---
-        ws.append([])
-        ws.append(["Asset Allocation", "Scenario (%)"])
-        ws["A9"].font = Font(bold=True)
-
-        assets = ["Gov Bonds", "Corp Bonds", "Equity 1", "Equity 2", "Property", "T-Bills"]
-        scen_w = res["w_opt"] * 100
-
-        for j, asset in enumerate(assets):
-            row_num = 10 + j
-            ws.cell(row=row_num, column=1, value=asset)
-            ws.cell(row=row_num, column=2, value=scen_w[j]).number_format = "0.0"
-
-        # Scenario Allocation Pie Chart
-        chart = PieChart()
-        chart.title = f"Allocation: {scen_name}"
-
-        data = Reference(ws, min_col=2, min_row=9, max_col=2, max_row=15)
-        cats = Reference(ws, min_col=1, min_row=10, max_row=15)
-        chart.add_data(data, titles_from_data=True)
-        chart.set_categories(cats)
-        ws.add_chart(chart, "D4")
-
-        # --- Scenario Frontier Data & Chart ---
-        # Write frontier data starting at Row 20
-        ws.cell(row=19, column=1, value="Efficient Frontier Data").font = Font(bold=True)
-        ws.cell(row=20, column=1, value="Solvency (%)")
-        ws.cell(row=20, column=2, value="Return (%)")
-
-        # Prep data
-        f_data = frontier_df[["solvency", "return"]].copy()
-        f_data["solvency"] *= 100
-        f_data["return"] *= 100
-
-        for idx, row in f_data.iterrows():
-            r_num = 21 + idx
-            ws.cell(row=r_num, column=1, value=row["solvency"])
-            ws.cell(row=r_num, column=2, value=row["return"])
-
-        # Create Scatter Chart
-        chart_scatter = ScatterChart()
-        chart_scatter.title = f"Frontier: {scen_name}"
-        chart_scatter.x_axis.title = "Solvency Ratio (%)"
-        chart_scatter.y_axis.title = "Expected Return (%)"
-        chart_scatter.style = 13
-
-        max_row = 20 + len(f_data)
-        xvalues = Reference(ws, min_col=1, min_row=21, max_row=max_row)
-        yvalues = Reference(ws, min_col=2, min_row=21, max_row=max_row)
-
-        # Create Series using the factory pattern
-        series = SeriesFactory(values=yvalues, xvalues=xvalues, title=f"Frontier {scen_name}")
-        series.marker.symbol = "circle"
-        series.graphicalProperties.line.noFill = True
-
-        chart_scatter.series.append(series)
-        ws.add_chart(chart_scatter, "D20")
-
-    prog_bar.progress(1.0)
-    status_text.text("Report generation complete!")
-
-    # Save
-    out = BytesIO()
-    wb.save(out)
-    return out.getvalue()
-
-
-# --- UI FOR EXPORT ---
-with col_export1:
-    st.markdown("### 📊 Comprehensive Excel Report")
-    st.markdown("Generates a workbook with **10+ Tabs**:")
-    st.markdown("1. **Executive Summary** (Current vs Optimal Pies)")
-    st.markdown("2. **mSCR Analysis** (Risk Tables & Charts)")
-    st.markdown("3-10. **Stress Test Scenarios** (Pies & Frontiers)")
-    st.info("⚠️ **Note:** This runs the optimizer 8 times. It may take ~30-60 seconds.")
-
-    if st.button("Generate Stress Test Report"):
-        with st.spinner("Compiling and running 8 optimization scenarios..."):
-            excel_data = generate_comprehensive_report()
-            st.download_button(
-                label="📥 Download Full Report (.xlsx)",
-                data=excel_data,
-                file_name=f"SolvencyII_StressTest_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-
-with col_export2:
-    st.markdown("### 📄 Simple Exports")
-    st.markdown("Download just the current screen's data.")
-
-    if 'allocation_export' not in locals():
-        allocation_export = pd.DataFrame({
-            "Asset Class": ["Gov Bonds", "Corp Bonds", "Equity 1", "Equity 2", "Property", "T-Bills"],
-            "Current (€m)": initial_asset["asset_val"].values,
-            "Optimal (€m)": best["A_opt"],
-            "Change (€m)": best["A_opt"] - initial_asset["asset_val"].values,
-            "Weight (%)": best["w_opt"] * 100
-        })
-    if 'frontier_export' not in locals():
-        frontier_export = opt_df[["gamma", "return", "SCR_market", "solvency", "objective"]].copy()
-
-    csv_alloc = allocation_export.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Allocation Only (CSV)", csv_alloc, "allocation.csv", "text/csv", use_container_width=True)
-
-    csv_frontier = frontier_export.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Frontier Only (CSV)", csv_frontier, "frontier.csv", "text/csv", use_container_width=True)
-
-    if 'risk_export' not in locals():
-        risk_export = pd.DataFrame()
-
-    json_export = {
-        "metadata": {"generated": str(datetime.now())},
-        "optimal_portfolio": {
-            "metrics": {"return": best_ret, "solvency": best_sol, "SCR": best_SCR},
-            "allocation": allocation_export.to_dict(orient="records"),
-            "risk": risk_export.to_dict(orient="records") if not risk_export.empty else []
-        }
-    }
-    st.download_button("📥 Full Data (JSON)", json.dumps(json_export, indent=2), "results.json", "application/json",
-                       use_container_width=True)
 # Sensitivity Analysis
 st.subheader("🔬 Sensitivity Analysis")
 
@@ -1544,3 +1216,321 @@ with sens_tab1:
                     st.error(f"Error in custom scenario: {str(e)}")
                     # st.exception(e) # Uncomment for debugging
     st.markdown("---")
+
+# =========================================================
+# 💾 EXPORT SECTION (With Sensitivity Scenarios & Specific Frontiers)
+# =========================================================
+st.subheader("💾 Export Results")
+col_export1, col_export2 = st.columns(2)
+
+# --- Define Scenarios ---
+scenarios_to_run = {
+    "Optimistic": {"type": "return", "val": 0.005},
+    "Pessimistic": {"type": "return", "val": -0.005},
+    "Higher Equity": {"type": "return_special", "asset": [2, 3], "val": 0.02},
+    "Lower Bond": {"type": "return_special", "asset": [0, 1], "val": -0.01},
+    "Stressed Shocks": {"type": "shock", "mult": 1.5},
+    "Relaxed Shocks": {"type": "shock", "mult": 0.7},
+    "High Eq Shock": {"type": "shock_special", "key": ["eq1", "eq2"], "val": 0.15},
+    "Low IR Shock": {"type": "shock_special", "key": ["ir_up", "ir_down"], "mult": 0.8}
+}
+
+# --- Helper: Run Optimization for a Scenario ---
+def run_scenario_optimization(name, config):
+    # Safety checks for session state variables
+    if "params" not in st.session_state:
+        return None, None
+    
+    sim_params = st.session_state["params"].copy()
+    sim_asset = initial_asset.copy()
+    
+    # 2. Apply Modifications
+    if config.get("type") == "return":
+        sim_asset["asset_ret"] = sim_asset["asset_ret"] + config["val"]
+        
+    elif config.get("type") == "return_special":
+        new_rets = sim_asset["asset_ret"].values.copy()
+        for idx in config["asset"]:
+            new_rets[idx] += config["val"]
+        sim_asset["asset_ret"] = new_rets
+        
+    elif config.get("type") == "shock":
+        for k in ["interest_up", "interest_down", "spread", "property", "equity_type1", "equity_type2"]:
+            sim_params[k] *= config["mult"]
+            
+    elif config.get("type") == "shock_special":
+        if "val" in config: 
+            for k in ["equity_type1", "equity_type2"]:
+                sim_params[k] = min(1.0, sim_params[k] + config["val"])
+        elif "mult" in config:
+             for k in ["interest_up", "interest_down"]:
+                sim_params[k] *= config["mult"]
+
+    # 3. Run Optimization
+    alloc_lims = pd.DataFrame({
+        "asset": ["gov_bond", "illiquid_assets", "t_bills", "corp_bond"],
+        "min_weight": [0.25, 0.0, 0.01, 0.0],
+        "max_weight": [0.90, 0.20, 0.10, 0.50], 
+    }).set_index("asset")
+
+    # Pass DataFrames directly
+    df_res = solve_frontier_combined(
+        sim_asset, liab_value, liab_duration, 
+        corr_down, corr_up, alloc_lims, sim_params
+    )
+    
+    if df_res.empty: return None, None
+    
+    # 4. Pick Best
+    best_sim = df_res.loc[df_res["objective"].idxmax()]
+    
+    # Return BOTH the best result AND the full dataframe (frontier)
+    return best_sim, df_res
+
+# --- Excel Generation Function ---
+def generate_comprehensive_report():
+    # Safely retrieve globally defined data
+    g = globals()
+    
+    # --- Start Workbook ---
+    wb = Workbook()
+    default_ws = wb.active
+    wb.remove(default_ws)
+    
+    # ==========================
+    # SHEET 1: EXECUTIVE SUMMARY
+    # ==========================
+    ws_main = wb.create_sheet("Executive Summary")
+    ws_main.sheet_view.showGridLines = False
+    
+    ws_main["A1"] = "SOLVENCY II STRATEGIC REPORT"
+    ws_main["A1"].font = Font(size=18, bold=True, color="2C3E50")
+    ws_main["A2"] = f"Generated: {datetime.now().strftime('%d %b %Y, %H:%M')}"
+    
+    # Base Case Metrics
+    ws_main["A4"] = "BASE CASE OVERVIEW"
+    ws_main["A4"].font = Font(bold=True, size=12)
+    
+    headers = ["Metric", "Current", "Optimal"]
+    ws_main.append([]) 
+    ws_main.append(headers)
+    
+    metrics = [
+        ("Expected Return", g['current_ret'], g['best_ret'], "0.00%"),
+        ("Solvency Ratio", g['current_sol'], g['best_sol'], "0.0%"),
+        ("SCR Market (€m)", g['current_SCR'], g['best_SCR'], "#,##0.0"),
+        ("Basic Own Funds (€m)", g['best_BOF'], g['best_BOF'], "#,##0.0") 
+    ]
+    
+    start_row = 6
+    for i, (name, cur, opt, fmt) in enumerate(metrics):
+        ws_main.cell(row=start_row+i, column=1, value=name)
+        c2 = ws_main.cell(row=start_row+i, column=2, value=cur); c2.number_format = fmt
+        c3 = ws_main.cell(row=start_row+i, column=3, value=opt); c3.number_format = fmt
+
+    # --- ALLOCATION DATA & CHARTS (Current vs Optimal) ---
+    ws_data = wb.create_sheet("Base_Data")
+    ws_data.append(["Asset", "Current Weight", "Optimal Weight"])
+    for i, asset in enumerate(["Gov", "Corp", "Eq1", "Eq2", "Prop", "TB"]):
+        ws_data.append([asset, g['initial_asset']["asset_weight"].values[i], g['best']["w_opt"][i]])
+    
+    # 1. Optimal Allocation Pie
+    chart_opt = PieChart()
+    chart_opt.title = "Optimal Allocation"
+    data_opt = Reference(ws_data, min_col=3, min_row=1, max_row=7)
+    cats = Reference(ws_data, min_col=1, min_row=2, max_row=7)
+    chart_opt.add_data(data_opt, titles_from_data=True)
+    chart_opt.set_categories(cats)
+    ws_main.add_chart(chart_opt, "E4")
+
+    # 2. Current Allocation Pie
+    chart_cur = PieChart()
+    chart_cur.title = "Current Allocation"
+    data_cur = Reference(ws_data, min_col=2, min_row=1, max_row=7)
+    chart_cur.add_data(data_cur, titles_from_data=True)
+    chart_cur.set_categories(cats)
+    ws_main.add_chart(chart_cur, "M4") # Place to the right
+
+    # ==========================
+    # SHEET 2: mSCR ANALYSIS
+    # ==========================
+    if 'disp_df' in g and not g['disp_df'].empty:
+        ws_mscr = wb.create_sheet("mSCR Analysis")
+        ws_mscr["A1"] = "Marginal SCR Contribution (Optimal Portfolio)"
+        ws_mscr["A1"].font = Font(size=14, bold=True)
+        ws_mscr.append([])
+        
+        # Write Table
+        for r in dataframe_to_rows(g['disp_df'], index=False, header=True):
+            ws_mscr.append(r)
+            
+        # Add Pie Chart for mSCR
+        chart_pie = PieChart()
+        chart_pie.title = "Risk Contribution (mSCR)"
+        
+        labels = Reference(ws_mscr, min_col=1, min_row=4, max_row=4+len(g['disp_df']))
+        data = Reference(ws_mscr, min_col=2, min_row=3, max_row=4+len(g['disp_df']))
+        
+        chart_pie.add_data(data, titles_from_data=True)
+        chart_pie.set_categories(labels)
+        ws_mscr.add_chart(chart_pie, "E3")
+
+    # ==========================
+    # SCENARIO SHEETS (Loop)
+    # ==========================
+    prog_bar = st.progress(0)
+    status_text = st.empty()
+    total_scenarios = len(scenarios_to_run)
+    
+    for i, (scen_name, config) in enumerate(scenarios_to_run.items()):
+        status_text.text(f"Running scenario {i+1}/{total_scenarios}: {scen_name}...")
+        prog_bar.progress((i) / total_scenarios)
+        
+        # Run Optimization -> Get Best AND Full Frontier
+        res, frontier_df = run_scenario_optimization(scen_name, config)
+        if res is None: continue
+            
+        ws = wb.create_sheet(f"Sens - {scen_name}")
+        ws["A1"] = f"SCENARIO: {scen_name.upper()}"
+        ws["A1"].font = Font(size=14, bold=True, color="E74C3C")
+        ws["A2"] = f"Type: {config['type']}"
+        
+        # --- Metrics Table ---
+        ws.append([])
+        ws.append(["Metric", "Base Optimal", "Scenario Optimal", "Delta"])
+        ws["A4"].font = Font(bold=True)
+        
+        scen_ret, scen_sol, scen_scr = res["return"], res["solvency"], res["SCR_market"]
+        
+        data_rows = [
+            ("Return", g['best_ret'], scen_ret, "0.00%"),
+            ("Solvency", g['best_sol'], scen_sol, "0.0%"),
+            ("SCR (€m)", g['best_SCR'], scen_scr, "#,##0.0")
+        ]
+        
+        for r_idx, (m, b, s, fmt) in enumerate(data_rows, 5):
+            ws.cell(row=r_idx, column=1, value=m)
+            ws.cell(row=r_idx, column=2, value=b).number_format = fmt
+            c_s = ws.cell(row=r_idx, column=3, value=s); c_s.number_format = fmt
+            c_d = ws.cell(row=r_idx, column=4, value=s-b); c_d.number_format = fmt
+            
+            if m == "Return" and s < b: c_d.font = Font(color="FF0000")
+            if m == "Solvency" and s < 1.0: c_s.font = Font(color="FF0000", bold=True)
+
+        # --- Allocation Table & Pie Chart ---
+        ws.append([])
+        ws.append(["Asset Allocation", "Scenario (%)"])
+        ws["A9"].font = Font(bold=True)
+        
+        assets = ["Gov Bonds", "Corp Bonds", "Equity 1", "Equity 2", "Property", "T-Bills"]
+        scen_w = res["w_opt"] * 100
+        
+        for j, asset in enumerate(assets):
+            row_num = 10 + j
+            ws.cell(row=row_num, column=1, value=asset)
+            ws.cell(row=row_num, column=2, value=scen_w[j]).number_format = "0.0"
+
+        # Scenario Allocation Pie Chart
+        chart = PieChart()
+        chart.title = f"Allocation: {scen_name}"
+        
+        data = Reference(ws, min_col=2, min_row=9, max_col=2, max_row=15)
+        cats = Reference(ws, min_col=1, min_row=10, max_row=15)
+        chart.add_data(data, titles_from_data=True)
+        chart.set_categories(cats)
+        ws.add_chart(chart, "D4")
+
+        # --- Scenario Frontier Data & Chart ---
+        # Write frontier data starting at Row 20
+        ws.cell(row=19, column=1, value="Efficient Frontier Data").font = Font(bold=True)
+        ws.cell(row=20, column=1, value="Solvency (%)")
+        ws.cell(row=20, column=2, value="Return (%)")
+        
+        f_data = frontier_df[["solvency", "return"]].copy()
+        f_data["solvency"] *= 100
+        f_data["return"] *= 100
+        
+        for idx, row in f_data.iterrows():
+            r_num = 21 + idx
+            ws.cell(row=r_num, column=1, value=row["solvency"])
+            ws.cell(row=r_num, column=2, value=row["return"])
+            
+        chart_scatter = ScatterChart()
+        chart_scatter.title = f"Frontier: {scen_name}"
+        chart_scatter.x_axis.title = "Solvency Ratio (%)"
+        chart_scatter.y_axis.title = "Expected Return (%)"
+        chart_scatter.style = 13
+        
+        max_row = 20 + len(f_data)
+        xvalues = Reference(ws, min_col=1, min_row=21, max_row=max_row)
+        yvalues = Reference(ws, min_col=2, min_row=21, max_row=max_row)
+        
+        # FIX: Enabled the line by NOT setting noFill=True
+        series = Series(values=yvalues, xvalues=xvalues, title=f"Frontier {scen_name}")
+        series.marker.symbol = "circle"
+        series.smooth = True # Makes the line curved and nice
+        
+        chart_scatter.series.append(series)
+        ws.add_chart(chart_scatter, "D20")
+
+    prog_bar.progress(1.0)
+    status_text.text("Report generation complete!")
+    
+    # Save
+    out = BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+# --- UI FOR EXPORT ---
+with col_export1:
+    st.markdown("### 📊 Comprehensive Excel Report")
+    st.markdown("Generates a workbook with **10+ Tabs**:")
+    st.markdown("1. **Executive Summary** (Current vs Optimal Pies)")
+    st.markdown("2. **mSCR Analysis** (Risk Tables & Charts)")
+    st.markdown("3-10. **Stress Test Scenarios** (Pies & Frontiers)")
+    st.info("⚠️ **Note:** This runs the optimizer 8 times. It may take ~30-60 seconds.")
+    
+    if st.button("Generate Stress Test Report"):
+        with st.spinner("Compiling and running 8 optimization scenarios..."):
+            excel_data = generate_comprehensive_report()
+            st.download_button(
+                label="📥 Download Full Report (.xlsx)",
+                data=excel_data,
+                file_name=f"SolvencyII_StressTest_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+
+with col_export2:
+    st.markdown("### 📄 Simple Exports")
+    st.markdown("Download just the current screen's data.")
+    
+    if 'allocation_export' not in locals():
+        allocation_export = pd.DataFrame({
+            "Asset Class": ["Gov Bonds", "Corp Bonds", "Equity 1", "Equity 2", "Property", "T-Bills"],
+            "Current (€m)": initial_asset["asset_val"].values,
+            "Optimal (€m)": best["A_opt"],
+            "Change (€m)": best["A_opt"] - initial_asset["asset_val"].values,
+            "Weight (%)": best["w_opt"] * 100
+        })
+    if 'frontier_export' not in locals():
+        frontier_export = opt_df[["gamma", "return", "SCR_market", "solvency", "objective"]].copy()
+
+    csv_alloc = allocation_export.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Allocation Only (CSV)", csv_alloc, "allocation.csv", "text/csv", use_container_width=True)
+    
+    csv_frontier = frontier_export.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Frontier Only (CSV)", csv_frontier, "frontier.csv", "text/csv", use_container_width=True)
+
+    if 'risk_export' not in locals():
+        risk_export = pd.DataFrame()
+        
+    json_export = {
+        "metadata": {"generated": str(datetime.now())},
+        "optimal_portfolio": {
+            "metrics": {"return": best_ret, "solvency": best_sol, "SCR": best_SCR},
+            "allocation": allocation_export.to_dict(orient="records"),
+            "risk": risk_export.to_dict(orient="records") if not risk_export.empty else []
+        }
+    }
+    st.download_button("📥 Full Data (JSON)", json.dumps(json_export, indent=2), "results.json", "application/json", use_container_width=True)
