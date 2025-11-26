@@ -116,6 +116,8 @@ def plot_frontier(opt_df: pd.DataFrame,
 # --------------------------
 # Plotting Helper Function
 # --------------------------
+
+'''
 def plot_scenario_comparison(opt_df, base_best, sens_best, current_ret, current_sol, sens_df=None):
     """
     Generates a comparison plot showing Base Optimal, Current, and New Scenario Optimal.
@@ -179,4 +181,166 @@ def plot_scenario_comparison(opt_df, base_best, sens_best, current_ret, current_
     ax.grid(True, alpha=0.25, linestyle='--')
     ax.legend(loc='lower right', frameon=True, shadow=True)
     
+    return fig
+
+'''
+
+def plot_scenario_comparison(opt_df, base_best, sens_best, current_ret, current_sol, sens_df=None):
+    """
+    Scenario Comparison Plot — Styled exactly like the Efficient Frontier plot.
+    Shows:
+    - Base Efficient Frontier
+    - Scenario Frontier
+    - Base Optimal Portfolio (Gold Star)
+    - Scenario Optimal Portfolio (Purple Triangle)
+    - Current Portfolio (Red Dot)
+    """
+
+    # --- INTERNAL HELPER: PARETO CLEANER ---
+    def get_pareto(df):
+        if df is None or df.empty:
+            return None
+        df = df.sort_values("solvency", ascending=False).copy()
+        df["max_return_seen"] = df["return"].cummax()
+        df = df[df["return"] >= df["max_return_seen"]]
+        return df.sort_values("solvency")
+
+    # Initialize figure
+    fig, ax = plt.subplots(figsize=(12, 7))
+    ax.set_facecolor("white")
+    fig.patch.set_facecolor("white")
+
+    # === 1. FEASIBLE SET (grey points) ===
+    ax.scatter(
+        opt_df["solvency"] * 100,
+        opt_df["return"] * 100,
+        s=30,
+        color="gray",
+        alpha=0.25,
+        label="Feasible Portfolios",
+        zorder=1
+    )
+
+    # === 2. BASE FRONTIER (dark blue, consistent with main plot) ===
+    base_front = get_pareto(opt_df)
+    if base_front is not None:
+        ax.plot(
+            base_front["solvency"] * 100,
+            base_front["return"] * 100,
+            "-",
+            color="#003366",
+            linewidth=3,
+            label="Base Efficient Frontier",
+            zorder=2
+        )
+
+    # === 3. SCENARIO FRONTIER (purple dashed) ===
+    if sens_df is not None and not sens_df.empty:
+        scen_front = get_pareto(sens_df)
+        if scen_front is not None:
+            ax.plot(
+                scen_front["solvency"] * 100,
+                scen_front["return"] * 100,
+                "--",
+                color="#9B59B6",
+                linewidth=3,
+                alpha=0.8,
+                label="Scenario Frontier",
+                zorder=3
+            )
+
+    # === 4. BASE OPTIMAL PORTFOLIO (gold star) ===
+    base_sol = base_best["solvency"] * 100
+    base_ret = base_best["return"] * 100
+    ax.scatter(
+        base_sol, base_ret,
+        s=200, c="#FFD700", marker="*",
+        edgecolors="#FF8C00",
+        linewidth=2.5,
+        label="Base Optimal",
+        zorder=5
+    )
+    
+    ax.annotate(
+        f'BASE OPTIMAL\n{base_ret:.2f}% | {base_sol:.1f}%',
+        xy=(base_sol, base_ret),
+        xytext=(25, 25),
+        textcoords="offset points",
+        fontsize=10, fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.6", facecolor="#FFD700",
+                  edgecolor="#FF8C00", alpha=0.9),
+        arrowprops=dict(arrowstyle="->", color="#FF8C00", lw=2.2),
+        zorder=6
+    )
+
+    # === 5. CURRENT PORTFOLIO (red circle) ===
+    cur_sol = current_sol * 100
+    cur_ret = current_ret * 100
+    ax.scatter(
+        cur_sol, cur_ret,
+        s=80, c="#E74C3C", marker="o",
+        edgecolors="#C0392B", linewidth=2,
+        label="Current Portfolio",
+        zorder=4
+    )
+    
+    ax.annotate(
+        f'CURRENT\n{cur_ret:.2f}% | {cur_sol:.1f}%',
+        xy=(cur_sol, cur_ret),
+        xytext=(-50, -35),
+        textcoords="offset points",
+        fontsize=9, fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.6", facecolor="#FADBD8",
+                  edgecolor="#C0392B", alpha=0.9),
+        arrowprops=dict(arrowstyle="->", color="#C0392B", lw=2),
+        zorder=6
+    )
+
+    # === 6. SCENARIO OPTIMAL (purple triangle) ===
+    scen_sol = sens_best["solvency"] * 100
+    scen_ret = sens_best["return"] * 100
+    ax.scatter(
+        scen_sol, scen_ret,
+        s=220, c="#9B59B6", marker="^",
+        edgecolors="#6C3483",
+        linewidth=3,
+        label="Scenario Optimal",
+        zorder=6
+    )
+
+    ax.annotate(
+        f'SCENARIO OPTIMAL\n{scen_ret:.2f}% | {scen_sol:.1f}%',
+        xy=(scen_sol, scen_ret),
+        xytext=(-60, 40),
+        textcoords="offset points",
+        fontsize=10, fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.6", facecolor="#D7BDE2",
+                  edgecolor="#6C3483", alpha=0.9),
+        arrowprops=dict(arrowstyle="->", color="#6C3483", lw=2),
+        zorder=7
+    )
+
+    # === 7. Styling (same as your frontier plot) ===
+    ax.axvline(
+        x=100, color="#95A5A6",
+        linestyle="--", linewidth=2.2, alpha=0.6,
+        label="100% Solvency"
+    )
+
+    ax.set_xlabel("Solvency Ratio (%)", fontsize=12, fontweight="bold", color="#2c3e50")
+    ax.set_ylabel("Expected Return (%)", fontsize=12, fontweight="bold", color="#2c3e50")
+    ax.set_title("Scenario Comparison: Optimal Portfolios", fontsize=15, fontweight="bold")
+    ax.grid(True, alpha=0.25, linestyle="--")
+
+    ax.tick_params(colors="#2c3e50")
+    
+    ax.legend(
+    loc="upper right",          # ← move legend to upper-right
+    bbox_to_anchor=(1, 1),      # ← ensure it sits inside the axes
+    frameon=True, shadow=True, fancybox=True
+    )
+
+    # Force x-axis to start at 90%
+    ax.set_xlim(90, None)
+
     return fig

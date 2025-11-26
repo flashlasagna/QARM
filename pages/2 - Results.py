@@ -94,8 +94,8 @@ scr_int_CUR = scr_interest_rate(
 
 # 2. Equity Risk
 A_eq1_CUR = initial_asset["asset_val"][2]
-A_eq1_CUR = initial_asset["asset_val"][3]
-scr_eq_CUR = scr_eq(A_eq1_CUR, A_eq1_CUR, solv["equity_1_param"], solv["equity_2_param"], solv["rho"])
+A_eq2_CUR = initial_asset["asset_val"][3]
+scr_eq_CUR = scr_eq(A_eq1_CUR, A_eq2_CUR, solv["equity_1_param"], solv["equity_2_param"], solv["rho"])
 
 # 3. Property Risk
 scr_prop_CUR = scr_prop(initial_asset["asset_val"][4], solv["prop_params"])
@@ -209,111 +209,66 @@ with col4:
 
 st.markdown("---")
 
-
-# --- 5. Efficient Frontier Plot (High Fidelity) ---
+# --- Efficient Frontier Plot (White Background + Annotations Kept) ---
 st.subheader("Efficient Frontier")
 
-# 1. SORTING: Order by Solvency Ratio to ensure the line draws sequentially
-# We sort descending (High Solvency -> Low Solvency) to help the filter logic
+# --- 1. Sort & Extract Pareto Frontier ---
 opt_sorted = opt_df.sort_values(by="solvency", ascending=False).copy()
-
-# 2. PARETO FILTER: Keep only the "Upper Envelope"
-# Logic: Scanning from the safest (Right) to riskiest (Left), 
-# we only keep a point if it offers a HIGHER return than everything safer than it.
-# If a risky portfolio has a lower return than a safer one, it's inefficient -> Trash it.
-
 opt_sorted["max_return_seen"] = opt_sorted["return"].cummax()
-# Keep points where the return is the new highest we've seen so far
 pareto_frontier = opt_sorted[opt_sorted["return"] >= opt_sorted["max_return_seen"]]
-
-# Sort back to ascending for proper line plotting (Left to Right)
 pareto_frontier = pareto_frontier.sort_values(by="solvency")
 
+# --- 2. Create Figure (WHITE background) ---
 fig_frontier, ax_frontier = plt.subplots(figsize=(12, 7))
-ax_frontier.set_facecolor('#f8f9fa')
-fig_frontier.patch.set_facecolor('white')
+ax_frontier.set_facecolor("white")      # chart background white
+fig_frontier.patch.set_facecolor("white")
 
-# A. Plot the "Feasible Set" (All points) as faint dots
-# This shows the user the full search space, including the inefficient 'hooks'
+# --- 3. Feasible Set (gray dots) ---
 ax_frontier.scatter(
-    opt_df["solvency"] * 100, 
-    opt_df["return"] * 100, 
-    s=30, 
-    color='gray', 
-    alpha=0.2, 
-    label='Feasible Portfolios'
+    opt_df["solvency"] * 100,
+    opt_df["return"] * 100,
+    s=30,
+    color="gray",
+    alpha=0.25,
+    label="Feasible Portfolios"
 )
 
-# B. Plot the "Efficient Frontier" (Filtered Line)
-# This will now be a smooth curve without zig-zags
+# --- 4. Efficient Frontier (dark blue line) ---
 ax_frontier.plot(
-    pareto_frontier["solvency"] * 100, 
-    pareto_frontier["return"] * 100, 
-    '-', 
-    color='#4ECDC4', 
-    linewidth=3, 
+    pareto_frontier["solvency"] * 100,
+    pareto_frontier["return"] * 100,
+    '-',
+    color='#003366',       # dark blue
+    linewidth=3,
     label='Efficient Frontier',
     zorder=2
 )
 
-# Optimal Point (Gold Star)
-# We stick to the mathematically optimal point found by the solver
+# --- 5. Optimal Portfolio (gold star) ---
 optimal_solvency = best["solvency"] * 100
 optimal_return = best["return"] * 100
 
 ax_frontier.scatter(
-    optimal_solvency, optimal_return, 
+    optimal_solvency, optimal_return,
     s=100, c='#FFD700', marker='*',
-    edgecolors='#FF8C00', linewidth=3, 
-    label='Optimal Portfolio', 
+    edgecolors='#FF8C00', linewidth=3,
+    label='Optimal Portfolio',
     zorder=5
 )
 
-# Annotation for Optimal
-ax_frontier.annotate(
-    f'OPTIMAL\n{optimal_return:.2f}% | {optimal_solvency:.1f}%',
-    xy=(optimal_solvency, optimal_return), xytext=(25, 25),
-    textcoords='offset points', fontsize=10, fontweight='bold',
-    bbox=dict(boxstyle='round,pad=0.8', facecolor='#FFD700', edgecolor='#FF8C00', alpha=0.9),
-    arrowprops=dict(arrowstyle='->', color='#FF8C00', lw=2.5), zorder=6
-)
-
-# Current Point (Red Diamond)
-ax_frontier.scatter(
-    current_sol * 100, current_ret * 100, 
-    s=100, c='#E74C3C', marker='D',
-    edgecolors='#C0392B', linewidth=3, 
-    label='Current Portfolio', 
-    zorder=4, alpha=0.9
-)
-
-# ======== OPTIMAL POINT (Gold Star + Annotation) ========
-ax_frontier.scatter(
-    optimal_solvency, optimal_return, 
-    s=200, c='#FFD700', marker='*',
-    edgecolors='#FF8C00', linewidth=3, 
-    label='Optimal Portfolio', 
-    zorder=5
-)
-
+# --- Optimal Annotation ---
 ax_frontier.annotate(
     f'OPTIMAL\n{optimal_return:.2f}% | {optimal_solvency:.1f}%',
     xy=(optimal_solvency, optimal_return),
     xytext=(25, 25),
     textcoords='offset points',
     fontsize=10, fontweight='bold',
-    bbox=dict(
-        boxstyle='round,pad=0.7',
-        facecolor='#FFD700',
-        edgecolor='#FF8C00',
-        alpha=0.9
-    ),
-    arrowprops=dict(arrowstyle='->', color='#FF8C00', lw=2.2),
+    bbox=dict(boxstyle='round,pad=0.8', facecolor='#FFD700', edgecolor='#FF8C00', alpha=0.9),
+    arrowprops=dict(arrowstyle='->', color='#FF8C00', lw=2.5),
     zorder=6
 )
 
-
-# ======== CURRENT POINT (Red Dot + Annotation) ========
+# --- 6. Current Portfolio (red dot) ---
 ax_frontier.scatter(
     current_sol * 100, current_ret * 100,
     s=60, c='#E74C3C', marker='o',
@@ -322,10 +277,11 @@ ax_frontier.scatter(
     zorder=4, alpha=0.95
 )
 
+# --- Current Annotation ---
 ax_frontier.annotate(
     f'CURRENT\n{current_ret*100:.2f}% | {current_sol*100:.1f}%',
     xy=(current_sol * 100, current_ret * 100),
-    xytext=(-50, -35),         # offset down-left so it doesn't overlap
+    xytext=(-50, -35),
     textcoords='offset points',
     fontsize=9, fontweight='bold',
     bbox=dict(
@@ -338,19 +294,117 @@ ax_frontier.annotate(
     zorder=6
 )
 
+# --- 7. Styling ---
+ax_frontier.axvline(
+    x=100, color='#95a5a6',
+    linestyle='--', linewidth=2.5, alpha=0.6,
+    label='100% Solvency'
+)
 
-# Styling
-ax_frontier.axvline(x=100, color='#95a5a6', linestyle='--', linewidth=2.5, alpha=0.6, label='100% Solvency')
 ax_frontier.set_xlabel('Solvency Ratio (%)', fontsize=12, fontweight='bold', color='#2c3e50')
 ax_frontier.set_ylabel('Expected Return (%)', fontsize=12, fontweight='bold', color='#2c3e50')
+
+ax_frontier.tick_params(colors='#2c3e50')
 ax_frontier.grid(True, alpha=0.25, linestyle='--', linewidth=1)
-ax_frontier.legend(loc='upper right', frameon=True, fancybox=True, shadow=True)
+
+# Legend
+ax_frontier.legend(
+    loc='upper right',
+    frameon=True, fancybox=True, shadow=True
+)
 
 st.pyplot(fig_frontier, use_container_width=True)
 st.markdown("---")
 
+
+
 # --- 6. Optimal Allocation Tables ---
-st.subheader("💼 Optimal Portfolio Allocation")
+
+def style_change_column_apply(df, column_name="Change (€m)"):
+    """
+    Adaptive gradient coloring for a 'Change' column using Styler.apply.
+    Positive → green gradient
+    Negative → red gradient
+    Zero → white
+    Works even if there's only a single positive or negative value.
+    """
+
+    vals = df[column_name]
+
+    # positive values
+    pos_vals = vals[vals > 0]
+    if not pos_vals.empty:
+        pos_min = pos_vals.min()
+        pos_max = pos_vals.max()
+    else:
+        pos_min = pos_max = 0
+
+    # negative values
+    neg_vals = vals[vals < 0]
+    if not neg_vals.empty:
+        neg_min = neg_vals.min()
+        neg_max = neg_vals.max()
+    else:
+        neg_min = neg_max = 0
+
+    def style_row(row):
+        styles = [""] * len(row)
+        val = row[column_name]
+
+        # ZERO
+        if val == 0:
+            styles[row.index.get_loc(column_name)] = (
+                "background-color: white; color: black;"
+            )
+            return styles
+
+        # POSITIVE
+        if val > 0:
+            if pos_max > pos_min:
+                scale = (val - pos_min) / (pos_max - pos_min)   # 0 → 1
+            else:
+                # only one positive value → fixed mid intensity
+                scale = 1.0
+
+            # light → darker green (#DFF5E1 → #2ECC71)
+            r = int(223 - scale * (223 - 46))
+            g = int(245 - scale * (245 - 204))
+            b = int(225 - scale * (225 - 113))
+
+            styles[row.index.get_loc(column_name)] = (
+                f"background-color: rgb({r},{g},{b}); color: black;"
+            )
+            return styles
+
+        # NEGATIVE
+        if val < 0:
+            if neg_min < neg_max:
+                # for negatives, min is more negative; normalize 0 → 1
+                scale = (val - neg_max) / (neg_min - neg_max)
+            else:
+                # only one negative value → fixed mid intensity
+                scale = 1.0
+
+            # light → darker red (#FADBD8 → #E74C3C)
+            r = int(250 - scale * (250 - 231))
+            g = int(219 - scale * (219 - 76))
+            b = int(216 - scale * (216 - 60))
+
+            styles[row.index.get_loc(column_name)] = (
+                f"background-color: rgb({r},{g},{b}); color: black;"
+            )
+            return styles
+
+        # fallback
+        styles[row.index.get_loc(column_name)] = (
+            "background-color: white; color: black;"
+        )
+        return styles
+
+    return df.style.apply(style_row, axis=1)
+
+
+st.subheader("Optimal Portfolio Allocation")
 
 col_left, col_right = st.columns([1, 1])
 A_opt = best["A_opt"]
@@ -368,13 +422,17 @@ with col_left:
     })
 
     # FIX: Add Return (%) to style.format
-    st.dataframe(
-        allocation_df.style.format({
+    allocation_df = (
+        style_change_column_apply(allocation_df, "Change (€m)")
+        .format({
             "Return (%)": "{:.2f}",
             "Current (€m)": "{:.1f}",
             "Optimal (€m)": "{:.1f}",
             "Change (€m)": "{:+.1f}"
-        }),
+        })
+    )
+    st.dataframe(
+        allocation_df,
         use_container_width=True,
         hide_index=True
     )
@@ -389,15 +447,22 @@ with col_right:
     })
 
     # FIX: Apply formatting only to specific numeric columns
-    st.dataframe(
-        weights_df.style.format({
+
+    weights_df = (
+        style_change_column_apply(weights_df, "Change (%)")
+        .format({
             "Current (%)": "{:.1f}",
             "Optimal (%)": "{:.1f}",
             "Change (%)": "{:+.1f}"
-        }),
+        })
+    )
+
+    st.dataframe(
+        weights_df,
         use_container_width=True,
         hide_index=True
     )
+
 st.markdown("---")
 
 # --- 7. Pie Charts (Restored Visuals) ---
@@ -523,10 +588,10 @@ if False:
         scr_sprd_val
     ])
 
+
 market_SCR_opt = opt_df.loc[best_idx, "SCR_breakdown"]
 
 scr_vec = np.array(market_SCR_opt.iloc[:4, ]['SCR'])
-
 
 # Get it from the optimizer
 direction = opt_df.loc[best_idx, 'direction']
@@ -556,74 +621,161 @@ opt_asset_df["asset_val"] = best["A_opt"]
 
 mscr_assets = allocate_marginal_scr(marg_risk_df, direction, opt_asset_df, alloc_params)
 
-
-
+asset_mSCR_CUR = allocate_marginal_scr(
+    marg_risk_CUR, 
+    direction_CUR, 
+    initial_asset, 
+    alloc_params
+)
 
 # --- 2. Display Results ---
 
-col_m1, col_m2 = st.columns([2, 1])
+col_m1, col_m2 = st.columns([1, 1])
 
 with col_m1:
 
     st.markdown("**SCR per risk type**")
+
     scr_display = pd.concat([market_scr_CUR['summary_table'], market_SCR_opt], axis=1)
     scr_display.columns=['Current', 'Optimal']
+    scr_display['change'] = (scr_display['Current'] - scr_display['Optimal']).astype('float')
     new_order = ["interest", "equity", "property", "spread", "diversification", "total"]
     scr_display = scr_display.reindex(new_order)
 
     scr_display = scr_display.rename(
-    columns={"Current": "Current (€m)", "Optimal": "Optimal (€m)"},
-    index={
-        "interest": "Interest",
-        "equity": "Equity",
-        "property": "Property",
-        "spread": "Spread",
-        "diversification": "Diversified",
-        "total": "Total"
-    }
+        columns={"Current": "Current (€m)", "Optimal": "Optimal (€m)", "change": "Change (€m)"},
+        index={
+            "interest": "Interest",
+            "equity": "Equity",
+            "property": "Property",
+            "spread": "Spread",
+            "diversification": "Diversified",
+            "total": "Total"
+        }
     )
 
     scr_display = scr_display.reset_index()
 
-    st.dataframe(
-        scr_display.style.format({
+    # ------------------ IMPORTANT FIX ------------------
+    scr_df_raw = scr_display.copy()   # Save BEFORE styling
+    # ---------------------------------------------------
+
+    scr_display_styled = (
+        style_change_column_apply(scr_df_raw, "Change (€m)")
+        .format({
             "Current (€m)": "{:.1f}",
-            "Optimal (€m)": "{:.1f}"
-        }),
-        use_container_width=True,
-        hide_index=True
-    )    
-
-
-    st.markdown("**Asset Class Contribution Table**")
-    # Clean up table for display
-    disp_df = mscr_assets[["asset", "mSCR"]].copy()
-    disp_df["Contribution (%)"] = (disp_df["mSCR"] / disp_df["mSCR"].sum()) * 100
-
-    # Rename assets for cleaner display
-    asset_map = {
-        "gov_bond": "Gov Bonds", "corp_bond": "Corp Bonds",
-        "equity_1": "Equity 1", "equity_2": "Equity 2",
-        "property": "Property", "t_bills": "T-Bills"
-    }
-    disp_df["asset"] = disp_df["asset"].map(asset_map)
-
-    st.dataframe(
-        disp_df.style.format({
-            "mSCR": "{:.1f}",
-            "Contribution (%)": "{:.1f}%"
-        }).background_gradient(subset=["mSCR"], cmap="Reds"),
-        use_container_width=True,
-        hide_index=True
+            "Optimal (€m)": "{:.1f}",
+            "Change (€m)": "{:.1f}"
+        })
     )
 
-with col_m2:
-    st.markdown("**SCR Contribution by Asset**")
+    st.dataframe(scr_display_styled, use_container_width=True, hide_index=True)
 
-    # Prepare data for Pie Chart (handle negative mSCR if any, usually 0 or small)
-    # mSCR can be negative for hedging assets (Gov bonds), so a bar chart might be better technically,
-    # but user asked for Pie. We will clip negatives to 0 for Pie or separate them.
-    # Let's use a waterfall or bar chart for better accuracy, OR a Donut chart for positive contributors.
+
+with col_m2:
+    st.markdown("**Marginal SCR per asset**", 
+                help="Approximate increase in SCR when the allocation to the asset class increases by 1 unit")
+
+    mSCR_display = pd.concat(
+        [asset_mSCR_CUR[['asset', 'mSCR']].copy(),
+         mscr_assets[['mSCR']]],
+        axis=1
+    )
+    mSCR_display.columns = ['asset', 'Current', 'Optimal']
+    mSCR_display['Change'] = mSCR_display['Current'] - mSCR_display['Optimal']
+
+    mSCR_styled = (
+        style_change_column_apply(mSCR_display, 'Change')
+        .format({
+            "Current": "{:.2f}",
+            "Optimal": "{:.2f}",
+            "Change": "{:.2f}"
+        })
+    )
+    st.dataframe(mSCR_styled, use_container_width=True, hide_index=True)
+
+
+
+st.markdown("---")
+# --- SCR Pie Charts (Styled Like Allocation Pies) ---
+st.markdown("**SCR by Risk Type (Pie Charts)**")
+
+# Clean filtered SCR rows (your scr_df_raw has Risk column)
+pie_scr = scr_df_raw[scr_df_raw["risk"].isin(["Interest", "Equity", "Property", "Spread"])]
+
+# Extract values
+pie_current = pie_scr["Current (€m)"].values
+pie_optimal = pie_scr["Optimal (€m)"].values
+labels = pie_scr["risk"].values
+
+# Color palette (4 SCR risks)
+scr_colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4']
+
+
+# --- Helper for hiding tiny slices ---
+def make_autopct(values):
+    def pct_fmt(pct):
+        return f'{pct:.1f}%' if pct > 3 else ''
+    return pct_fmt
+
+
+# --- Build Side-by-Side Pies ---
+fig_scr, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
+fig_scr.patch.set_facecolor('white')
+
+
+# ===== CURRENT SCR PIE =====
+explode_current = [0.03 if v > pie_current.mean() else 0 for v in pie_current]
+
+ax1.pie(
+    pie_current,
+    labels=None,
+    colors=scr_colors,
+    autopct=make_autopct(pie_current),
+    startangle=90,
+    textprops={'fontsize': 11, 'weight': 'bold'},
+    pctdistance=0.80,
+    explode=explode_current,
+    shadow=True,
+    wedgeprops={'edgecolor': 'white', 'linewidth': 2}
+)
+ax1.set_title('Current SCR', fontsize=14, fontweight='bold', pad=25)
+
+
+# ===== OPTIMAL SCR PIE =====
+explode_opt = [0.03 if v > pie_optimal.mean() else 0 for v in pie_optimal]
+
+ax2.pie(
+    pie_optimal,
+    labels=None,
+    colors=scr_colors,
+    autopct=make_autopct(pie_optimal),
+    startangle=90,
+    textprops={'fontsize': 11, 'weight': 'bold'},
+    pctdistance=0.80,
+    explode=explode_opt,
+    shadow=True,
+    wedgeprops={'edgecolor': 'white', 'linewidth': 2}
+)
+ax2.set_title('Optimal SCR', fontsize=14, fontweight='bold', pad=25)
+
+
+# --- Legend ---
+fig_scr.legend(
+    labels,
+    title="Risk Types",
+    loc="lower center",
+    bbox_to_anchor=(0.5, -0.08),
+    ncol=4,
+    frameon=True,
+    shadow=True
+)
+
+st.pyplot(fig_scr, use_container_width=True)
+st.markdown("---")
+
+
+if False:
 
     plot_data = disp_df[disp_df["mSCR"] > 0].copy()
 
