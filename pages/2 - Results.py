@@ -1466,7 +1466,7 @@ def generate_comprehensive_report():
         yvalues = Reference(ws, min_col=2, min_row=21, max_row=max_row)
         
         # FIX: Enabled the line by NOT setting noFill=True
-        series = Series(values=yvalues, xvalues=xvalues, title=f"Frontier {scen_name}")
+        series = SeriesFactory(values=yvalues, xvalues=xvalues, title=f"Frontier {scen_name}")
         series.marker.symbol = "circle"
         series.smooth = True # Makes the line curved and nice
         
