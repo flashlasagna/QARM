@@ -56,7 +56,6 @@ This web application applies the **Solvency II Standard Formula** for the Market
 ### 4. Risk Analysis
 - **SCR Decomposition**: Interest Rate, Equity, Property, and Spread risks
 - **Marginal SCR Contribution**: Asset-level risk attribution
-- **Capital Efficiency Metrics**: ER/mSCR ratios for each asset class
 - **Diversification Benefits**: Correlation-based aggregation
 
 ### 5. Sensitivity Analysis
@@ -74,14 +73,6 @@ This web application applies the **Solvency II Standard Formula** for the Market
 - CSV, Excel, and JSON export formats
 - Comprehensive summary reports
 - Downloadable allocation tables and risk metrics
-
-## Academic Foundation
-
-This application is based on the Master's thesis:
-
-**"Trade-Off Between Asset Allocation and Solvency II Requirements: The Case of a Portuguese Life Insurer"**  
-*Daniel Alexandre da Silva Machado (2024)*  
-Master in Actuarial Science, ISEG Lisbon School of Economics & Management
 
 ### Key References
 - Kouwenberg, R. (2017, 2018): Strategic Asset Allocation and Risk Budgeting for Insurers under Solvency II
@@ -210,48 +201,63 @@ solvency-ii-optimizer/
 
 The optimizer uses **Convex Quadratic Programming (CQP)** to solve:
 
-$$\max \mathbb{E}[r^T x] - \lambda \cdot \sqrt{SCR^T \cdot \rho \cdot SCR}$$
+$$\max \mathbb{E}[r^T w] - \lambda \cdot \sqrt{SCR^T \cdot \rho \cdot SCR}$$
 
 Where:
 - $r$ = expected returns vector
-- $x$ = portfolio weights
+- $w$ = portfolio weights
 - $\lambda$ = penalty parameter (swept to generate frontier)
 - $SCR$ = stand-alone capital requirements vector
 - $\rho$ = correlation matrix
 
 ### SCR Calculation
 
-**Stand-alone SCR for risk type $i$:**
+flowchart TD
 
-$$SCR_i = |V_0 - V_{\text{shock}}|$$
+    subgraph A[Portfolio Inputs]
+        A1(Asset Exposures<br/>A_i)
+        A2(Asset Durations<br/>D_{A,i})
+        A3(Liability Value<br/>L)
+        A4(Liability Duration<br/>D_L)
+    end
 
-**Spread Risk:**
+    subgraph B[Stand-Alone SCR Calculations]
+        B1[Interest Rate SCR<br/><br/>SCR_IR = max{Up, Down}]
+        B2[Equity SCR<br/><br/>SCR_eq = sqrt(SCR1² + 2ρ SCR1 SCR2 + SCR2²)]
+        B3[Spread SCR<br/><br/>SCR_spr = A_corp · s_spread(d)]
+        B4[Property SCR<br/><br/>SCR_prop = 0.25 · A_prop]
+    end
 
-$$SCR_{\text{spread}} = \sum_{j} MV_j \cdot s_j$$
+    subgraph C[EIOPA Correlation Matrix<br/>Annex IV]
+        C1[ρ_ij<br/>Two versions:<br/>IR-Up / IR-Down]
+    end
 
-**Aggregated Market Risk:**
+    subgraph D[Aggregation]
+        D1[Market SCR<br/><br/>SCR_market = sqrt(SCRᵀ ρ SCR)]
+    end
 
-$$SCR_{\text{total}} = \sqrt{\sum_{i} \sum_{j} SCR_i \cdot SCR_j \cdot \rho_{ij}}$$
+    A --> B1
+    A --> B2
+    A --> B3
+    A --> B4
 
-### Capital Efficiency
+    B1 --> C1
+    B2 --> C1
+    B3 --> C1
+    B4 --> C1
 
-The tool calculates the **ER/mSCR ratio** (Expected Return / Marginal SCR) to identify which assets provide the best return per unit of capital consumed.
-
-**Key Findings from Case Study:**
-- **Most Efficient**: Corporate Bonds (ER/mSCR ≈ 0.60-0.61)
-- **Second Best**: Property (ER/mSCR ≈ 0.29-0.31)
-- **Least Efficient**: Equity Type 2 (ER/mSCR ≈ 0.14-0.15)
+    C1 --> D1
 
 ## Team
 
 ### Back-end Development (Portfolio Optimization & Modelling)
-- **Hoai Thuong Phan** - MSc Quantitative Asset & Risk Management
-- **Jacopo Sinigaglia** - MSc Quantitative Asset & Risk Management
-- **Angélique Nhât-Ngân Trinh** - MSc Quantitative Asset & Risk Management
+- **Hoai Thuong Phan** - MSc Asset & Risk Management
+- **Jacopo Sinigaglia** - MSc Asset & Risk Management
+- **Angélique Nhât-Ngân Trinh** - MSc Asset & Risk Management
 
 ### Front-end Development (Web Application & Visualization)
-- **Ruben Mimouni** - MSc Quantitative Asset & Risk Management
-- **Maxime Bezier** - MSc Quantitative Asset & Risk Management
+- **Ruben Mimouni** - MSc Asset & Risk Management
+- **Maxime Bezier** - MSc Asset & Risk Management
 
 ### Academic Supervision
 - **Prof. Divernois Marc-Aurèle** - HEC Lausanne
