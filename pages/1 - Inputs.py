@@ -515,6 +515,8 @@ if st.button("Optimize Portfolio", disabled=not can_optimize, type="primary", us
                 st.session_state["auto_calculated"] = use_auto_params
                 st.session_state["optimization_run"] = True
                 st.session_state["params"] = params  # Save the exact shocks used
+                st.session_state["allocation_limits"] = allocation_limits
+                
 
                 st.success("✅ Optimization completed successfully! Navigate to 'Results' page.")
 
