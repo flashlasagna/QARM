@@ -344,7 +344,7 @@ with st.expander("⚙️ Advanced Settings", expanded=not use_auto_params):
         gov_min = st.number_input("Gov Min", 0.0, 1.0, 0.40)
         gov_max = st.number_input("Gov Max", 0.0, 1.0, 0.90)
         corp_max = st.number_input("Corp Max", 0.0, 1.0, 0.40)
-        illiq_max = st.number_input("Illiquid Max", 0.0, 1.0, 0.10)
+        illiq_max = st.number_input("Illiquid Max", 0.0, 1.0, 0.20)
         tb_min = st.number_input("T-Bills Min", 0.0, 1.0, 0.01)
         tb_max = st.number_input("T-Bills Max", 0.0, 1.0, 0.10)
 
