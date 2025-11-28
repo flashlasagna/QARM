@@ -210,11 +210,11 @@ solvency-ii-optimizer/
 
 The optimizer uses **Convex Quadratic Programming (CQP)** to solve:
 
-$$\max \mathbb{E}[r^T x] - \lambda \cdot \sqrt{SCR^T \cdot \rho \cdot SCR}$$
+$$\max \mathbb{E}[r^T w] - \lambda \cdot \sqrt{SCR^T \cdot \rho \cdot SCR}$$
 
 Where:
 - $r$ = expected returns vector
-- $x$ = portfolio weights
+- $w$ = portfolio weights
 - $\lambda$ = penalty parameter (swept to generate frontier)
 - $SCR$ = stand-alone capital requirements vector
 - $\rho$ = correlation matrix
@@ -233,25 +233,16 @@ $$SCR_{\text{spread}} = \sum_{j} MV_j \cdot s_j$$
 
 $$SCR_{\text{total}} = \sqrt{\sum_{i} \sum_{j} SCR_i \cdot SCR_j \cdot \rho_{ij}}$$
 
-### Capital Efficiency
-
-The tool calculates the **ER/mSCR ratio** (Expected Return / Marginal SCR) to identify which assets provide the best return per unit of capital consumed.
-
-**Key Findings from Case Study:**
-- **Most Efficient**: Corporate Bonds (ER/mSCR ≈ 0.60-0.61)
-- **Second Best**: Property (ER/mSCR ≈ 0.29-0.31)
-- **Least Efficient**: Equity Type 2 (ER/mSCR ≈ 0.14-0.15)
-
 ## Team
 
 ### Back-end Development (Portfolio Optimization & Modelling)
-- **Hoai Thuong Phan** - MSc Quantitative Asset & Risk Management
-- **Jacopo Sinigaglia** - MSc Quantitative Asset & Risk Management
-- **Angélique Nhât-Ngân Trinh** - MSc Quantitative Asset & Risk Management
+- **Hoai Thuong Phan** - MSc Asset & Risk Management
+- **Jacopo Sinigaglia** - MSc Asset & Risk Management
+- **Angélique Nhât-Ngân Trinh** - MSc Asset & Risk Management
 
 ### Front-end Development (Web Application & Visualization)
-- **Ruben Mimouni** - MSc Quantitative Asset & Risk Management
-- **Maxime Bezier** - MSc Quantitative Asset & Risk Management
+- **Ruben Mimouni** - MSc Asset & Risk Management
+- **Maxime Bezier** - MSc Asset & Risk Management
 
 ### Academic Supervision
 - **Prof. Divernois Marc-Aurèle** - HEC Lausanne
