@@ -813,12 +813,12 @@ sens_tab1, sens_tab2, sens_tab3 = st.tabs([
     "🎯 Custom Scenario"
 ])
 
-# Retrieve saved limits (Critical for consistency)
-# If missing, we fallback to the hardcoded ones as a failsafe
+# --- CRITICAL FIX: Retrieve the User's Actual Limits ---
+# This ensures the "Base Case" matches your original optimization
 if "allocation_limits" in st.session_state:
     saved_limits = st.session_state["allocation_limits"]
 else:
-    # Fallback defaults
+    # Fallback only if limits aren't found
     saved_limits = pd.DataFrame({
         "asset": ["gov_bond", "illiquid_assets", "t_bills", "corp_bond"],
         "min_weight": [0.25, 0.0, 0.01, 0.0],
@@ -852,31 +852,32 @@ with sens_tab1:
                     scenario_returns = base_returns - 0.005
                 elif "Higher Equity" in scenario_choice:
                     scenario_returns = base_returns.copy()
-                    scenario_returns[2] += 0.02 # Eq1
-                    scenario_returns[3] += 0.02 # Eq2
+                    scenario_returns[2] += 0.02
+                    scenario_returns[3] += 0.02
                 elif "Lower Bond" in scenario_choice:
                     scenario_returns = base_returns.copy()
-                    scenario_returns[0] -= 0.01 # Gov
-                    scenario_returns[1] -= 0.01 # Corp
+                    scenario_returns[0] -= 0.01
+                    scenario_returns[1] -= 0.01
 
                 # Setup Inputs
                 sens_asset = initial_asset.copy()
                 sens_asset["asset_ret"] = scenario_returns
 
-                # Load Environment
-                cfg = load_config()
-                corr_down, corr_up = get_corr_matrices(cfg)
-                
-                # Retrieve Params (containing Shocks AND Solvency Min)
+                # Retrieve Params (Preserving Solvency Target)
                 if "params" in st.session_state:
                     params = st.session_state["params"]
                 else:
+                    cfg = load_config()
                     solv = get_solvency_params(cfg)
                     params = {
                         "interest_down": 0.009, "interest_up": 0.011, "spread": 0.103,
                         "equity_type1": 0.39, "equity_type2": 0.49,
                         "property": 0.25, "rho": 0.75, "solvency_min": 1.0
                     }
+                
+                # Re-load Environment
+                cfg = load_config()
+                corr_down, corr_up = get_corr_matrices(cfg)
 
                 sens_opt_df = solve_frontier_combined(
                     initial_asset=sens_asset, liab_value=liab_value, liab_duration=liab_duration,
@@ -896,8 +897,10 @@ with sens_tab1:
 
                     sc1, sc2, sc3 = st.columns(3)
                     sc1.metric("New Return", f"{sens_best['return']:.2%}", f"{(sens_best['return'] - best_ret):.2%}")
-                    sc2.metric("New Solvency", f"{sens_best['solvency'] * 100:.1f}%", f"{(sens_best['solvency'] - best_sol) * 100:.1f}pp")
+                    sc2.metric("New Solvency", f"{sens_best['solvency'] * 100:.1f}%", 
+                               f"{(sens_best['solvency'] - best_sol) * 100:.1f}pp")
 
+                    # Allocation Change
                     st.markdown("**Asset Allocation Change (pp)**")
                     diff = (sens_best["w_opt"] - best["w_opt"]) * 100
                     df_diff = pd.DataFrame([diff], columns=["Gov", "Corp", "Eq1", "Eq2", "Prop", "TB"])
@@ -925,7 +928,7 @@ with sens_tab2:
         key="shock_scenario"
     )
 
-    # Base shocks (Ideally retrieve from session params to match inputs)
+    # Base shocks (Retrieve from session to match inputs)
     if "params" in st.session_state:
         base_p = st.session_state["params"]
         base_shocks = {
@@ -976,7 +979,7 @@ with sens_tab2:
                 corr_down, corr_up = get_corr_matrices(cfg)
                 solv = get_solvency_params(cfg)
 
-                # Construct Params
+                # Construct Params (Including Solvency Target)
                 params = {
                     "interest_down": scenario_shocks["ir_down"],
                     "interest_up": scenario_shocks["ir_up"],
@@ -1002,7 +1005,7 @@ with sens_tab2:
                     sens_best = sens_opt_df.loc[sens_opt_df["objective"].idxmax()]
                     st.success("✓ Shock sensitivity analysis completed!")
                     
-                    # ... [Plotting and metrics code same as above] ...
+                    # Plot & Metrics
                     st.subheader("Scenario Optimal Portfolio Comparison")
                     fig = plot_scenario_comparison(opt_df, best, sens_best, current_ret, current_sol, sens_df=sens_opt_df)
                     st.pyplot(fig, use_container_width=True)
@@ -1019,7 +1022,16 @@ with sens_tab2:
                         "Scenario (%)": sens_best["w_opt"] * 100,
                         "Change (pp)": (sens_best["w_opt"] - best["w_opt"]) * 100
                     })
-                    st.dataframe(comparison_df.style.format("{:.1f}").background_gradient(subset=["Change (pp)"], cmap="RdYlGn", vmin=-10, vmax=10), use_container_width=True)
+                    
+                    # --- FIX: Format ONLY numeric columns to avoid string error ---
+                    st.dataframe(
+                        comparison_df.style.format({
+                            "Base (%)": "{:.1f}",
+                            "Scenario (%)": "{:.1f}",
+                            "Change (pp)": "{:+.1f}"
+                        }).background_gradient(subset=["Change (pp)"], cmap="RdYlGn", vmin=-10, vmax=10),
+                        use_container_width=True
+                    )
 
                 else:
                     st.error("Optimization failed. The shocks might be too severe to maintain solvency.")
