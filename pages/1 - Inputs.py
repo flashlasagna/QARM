@@ -384,7 +384,7 @@ if st.button("Optimize Portfolio", disabled=not can_optimize, type="primary", us
                     'corp_bond': st.session_state.get('ticker_corp', "IE15.L"),
                     'equity_1': st.session_state.get('ticker_eq1', "EUNL.DE"),
                     'equity_2': st.session_state.get('ticker_eq2', "IQQE.DE"),
-                    'property': st.session_state.get('ticker_prop', "EUNK.DE"),
+                    'property': st.session_state.get('ticker_prop', "SREEEX BW"),
                     't_bills': st.session_state.get('ticker_tbills', "CSH2.L")
                 }
 
