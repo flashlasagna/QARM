@@ -34,49 +34,29 @@ from backend.data_calculator import (
 def fetch_ticker_prices(ticker, start_date, end_date):
     """Robust ticker price fetching with fallback logic."""
     try:
-        # Strip whitespace and force auto_adjust=False to get 'Adj Close' reliably
-        clean_ticker = ticker.strip()
-        data = yf.download(clean_ticker, start=start_date, end=end_date, progress=False, auto_adjust=False)
-        
-        if data.empty: 
-            return None
+        data = yf.download(ticker, start=start_date, end=end_date, progress=False)
+        if data.empty: return None
 
-        # Robust Column Handling for different yfinance versions
-        prices = None
-        
-        # 1. Handle MultiIndex columns (common in new yfinance)
         if isinstance(data.columns, pd.MultiIndex):
-            # Check for 'Adj Close' first (Level 0)
-            if 'Adj Close' in data.columns.get_level_values(0):
-                prices = data['Adj Close']
-            elif 'Close' in data.columns.get_level_values(0):
-                prices = data['Close']
-        
-        # 2. Handle Flat columns
+            if 'Close' in data.columns.get_level_values(0):
+                prices = data['Close'].iloc[:, 0]
+            elif 'Adj Close' in data.columns.get_level_values(0):
+                prices = data['Adj Close'].iloc[:, 0]
+            else:
+                return None
         else:
             if 'Adj Close' in data.columns:
                 prices = data['Adj Close']
             elif 'Close' in data.columns:
                 prices = data['Close']
-
-        if prices is None:
-            return None
-
-        # If result is still a DataFrame (e.g. single ticker with MultiIndex), squeeze it to Series
-        if isinstance(prices, pd.DataFrame):
-            if prices.shape[1] == 1:
-                prices = prices.iloc[:, 0]
             else:
-                # Fallback: take the first column if multiple exist
-                prices = prices.iloc[:, 0]
+                return None
 
         prices = prices.dropna()
-        # Lower validation threshold to 50 points to catch "valid but short" data
-        return prices if len(prices) > 50 else None
-
+        return prices if len(prices) > 100 else None
     except Exception as e:
-        print(f"Error fetching {ticker}: {e}")
         return None
+
 
 
 def validate_inputs(A_gov, A_corp, A_eq1, A_eq2, A_prop, A_tb, total_A,
