@@ -700,7 +700,7 @@ st.markdown("""
 7. **Select and Analyse Target Portfolio**: Use the **Interactive Portfolio Selector** page to:
    - Slide along the efficient frontier to pick a portfolio that matches your specific risk appetite (e.g., "Aggressive" vs "Conservative").
    - Inspect the specific allocation and risk metrics for that chosen point.
-   - Export the final portfolio weights and summary report to CSV, Excel, or JSON.
+   - Export the final portfolio weights and summary report to CSV, TXT, or JSON.
 """)
 
 # ============================================================================
