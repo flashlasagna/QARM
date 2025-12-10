@@ -1037,13 +1037,12 @@ with sens_tab3:
         st.markdown("**📊 Custom Returns**")
         # Initialize with current asset returns as defaults
         defaults = initial_asset["asset_ret"].values
-        custom_r_gov = st.number_input("Gov Bonds Return", -0.10, 0.20, float(defaults[0]), 0.001, format="%.3f", key="c_r_gov")
-        custom_r_corp = st.number_input("Corp Bonds Return", -0.10, 0.20, float(defaults[1]), 0.001, format="%.3f", key="c_r_corp")
-        custom_r_eq1 = st.number_input("Equity 1 Return", -0.10, 0.20, float(defaults[2]), 0.001, format="%.3f", key="c_r_eq1")
-        custom_r_eq2 = st.number_input("Equity 2 Return", -0.10, 0.20, float(defaults[3]), 0.001, format="%.3f", key="c_r_eq2")
-        custom_r_prop = st.number_input("Property Return", -0.10, 0.20, float(defaults[4]), 0.001, format="%.3f", key="c_r_prop")
-        custom_r_tb = st.number_input("T-Bills Return", -0.10, 0.20, float(defaults[5]), 0.001, format="%.3f", key="c_r_tb")
-
+        custom_r_gov = st.number_input("Gov Bonds Return", -0.50, 1.0, float(defaults[0]), 0.001, format="%.3f", key="c_r_gov")
+        custom_r_corp = st.number_input("Corp Bonds Return", -0.50, 1.0, float(defaults[1]), 0.001, format="%.3f", key="c_r_corp")
+        custom_r_eq1 = st.number_input("Equity 1 Return", -0.50, 1.0, float(defaults[2]), 0.001, format="%.3f", key="c_r_eq1")
+        custom_r_eq2 = st.number_input("Equity 2 Return", -0.50, 1.0, float(defaults[3]), 0.001, format="%.3f", key="c_r_eq2")
+        custom_r_prop = st.number_input("Property Return", -0.50, 1.0, float(defaults[4]), 0.001, format="%.3f", key="c_r_prop")
+        custom_r_tb = st.number_input("T-Bills Return", -0.50, 1.0, float(defaults[5]), 0.001, format="%.3f", key="c_r_tb")
     with col2:
         st.markdown("**⚡ Custom Shocks**")
         # Retrieve base shocks/solvency from session state
